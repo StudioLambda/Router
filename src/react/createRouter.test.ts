@@ -1,7 +1,7 @@
 import { describe, it, vi } from 'vitest'
 import { createRouter, type RouteFactory } from './createRouter'
 import { type ComponentType } from 'react'
-import { type MiddlewareProps, type PrefetchFunc } from './router'
+import { type MiddlewareProps, type PrefetchContext, type PrefetchFunc } from './router'
 
 /**
  * Stub component used in tests where a real React component
@@ -34,15 +34,19 @@ function createMiddleware(): ComponentType<MiddlewareProps> {
 }
 
 /**
- * Creates a mock NavigationPrecommitController with spy
- * methods. Each test that needs one creates its own to
+ * Creates a mock PrefetchContext with spy methods on the
+ * controller. Each test that needs one creates its own to
  * avoid shared state between concurrent tests.
  */
-function createMockController() {
+function createMockContext(): PrefetchContext {
   return {
-    redirect: vi.fn(),
-    addHandler: vi.fn(),
-  } as unknown as NavigationPrecommitController
+    params: {},
+    url: new URL('http://localhost/'),
+    controller: {
+      redirect: vi.fn(),
+      addHandler: vi.fn(),
+    } as unknown as NavigationPrecommitController,
+  }
 }
 
 describe('createRouter', { concurrent: true }, function () {
@@ -210,9 +214,9 @@ describe('createRouter', { concurrent: true }, function () {
           .render(Stub)
       })
 
-      const controller = createMockController()
+      const context = createMockContext()
 
-      await router.match('/')?.handler.prefetch?.(controller)
+      await router.match('/')?.handler.prefetch?.(context)
 
       expect(order).toStrictEqual([1, 2])
     })
@@ -271,11 +275,11 @@ describe('createRouter', { concurrent: true }, function () {
         route('/old').redirect('/new')
       })
 
-      const controller = createMockController()
+      const context = createMockContext()
 
-      router.match('/old')?.handler.prefetch?.(controller)
+      router.match('/old')?.handler.prefetch?.(context)
 
-      expect(controller.redirect).toHaveBeenCalledWith('/new')
+      expect(context.controller.redirect).toHaveBeenCalledWith('/new')
     })
 
     it('uses a fallback component that renders null', function ({ expect }) {
@@ -306,11 +310,11 @@ describe('createRouter', { concurrent: true }, function () {
         app('/legacy').redirect('/new-page')
       })
 
-      const controller = createMockController()
+      const context = createMockContext()
 
-      router.match('/app/legacy')?.handler.prefetch?.(controller)
+      router.match('/app/legacy')?.handler.prefetch?.(context)
 
-      expect(controller.redirect).toHaveBeenCalledWith('/new-page')
+      expect(context.controller.redirect).toHaveBeenCalledWith('/new-page')
     })
   })
 
@@ -392,9 +396,9 @@ describe('createRouter', { concurrent: true }, function () {
         prefetched('/page').prefetch(routePrefetch).render(Stub)
       })
 
-      const controller = createMockController()
+      const context = createMockContext()
 
-      await router.match('/page')?.handler.prefetch?.(controller)
+      await router.match('/page')?.handler.prefetch?.(context)
 
       expect(order).toStrictEqual([1, 2])
     })
@@ -408,11 +412,11 @@ describe('createRouter', { concurrent: true }, function () {
         prefetched('/page').render(Stub)
       })
 
-      const controller = createMockController()
+      const context = createMockContext()
 
-      await router.match('/page')?.handler.prefetch?.(controller)
+      await router.match('/page')?.handler.prefetch?.(context)
 
-      expect(groupPrefetch).toHaveBeenCalledWith(controller)
+      expect(groupPrefetch).toHaveBeenCalledWith(context)
     })
   })
 
@@ -462,9 +466,9 @@ describe('createRouter', { concurrent: true }, function () {
         inner('/deep').prefetch(third).render(Stub)
       })
 
-      const controller = createMockController()
+      const context = createMockContext()
 
-      await router.match('/deep')?.handler.prefetch?.(controller)
+      await router.match('/deep')?.handler.prefetch?.(context)
 
       expect(order).toStrictEqual([1, 2, 3])
     })

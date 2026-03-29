@@ -28,7 +28,7 @@ describe('usePrefetch', { concurrent: true }, function () {
     expect(typeof current).toBe('function')
   })
 
-  it('calls the matched route prefetch handler with a stub controller', function ({ expect, onTestFinished }) {
+  it('calls the matched route prefetch handler with a PrefetchContext', function ({ expect, onTestFinished }) {
     const prefetchSpy = vi.fn()
     const matcher = createMatcher<Handler>()
 
@@ -47,10 +47,13 @@ describe('usePrefetch', { concurrent: true }, function () {
 
     expect(prefetchSpy).toHaveBeenCalledTimes(1)
 
-    const controller = prefetchSpy.mock.calls[0][0]
+    const context = prefetchSpy.mock.calls[0][0]
 
-    expect(typeof controller.redirect).toBe('function')
-    expect(typeof controller.addHandler).toBe('function')
+    expect(context.params).toStrictEqual({})
+    expect(context.url).toBeInstanceOf(URL)
+    expect(context.url.pathname).toBe('/about')
+    expect(typeof context.controller.redirect).toBe('function')
+    expect(typeof context.controller.addHandler).toBe('function')
   })
 
   it('returns undefined when no route matches', function ({ expect, onTestFinished }) {

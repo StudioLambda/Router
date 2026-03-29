@@ -15,8 +15,8 @@ export interface Handler {
 
   /**
    * Optional prefetch function invoked during the precommit phase.
-   * Receives the NavigationPrecommitController which can be used
-   * to redirect the navigation before it commits.
+   * Receives a context with matched route params, destination URL,
+   * and the precommit controller for redirects.
    */
   readonly prefetch?: PrefetchFunc
 
@@ -56,18 +56,51 @@ export interface Handler {
 }
 
 /**
+ * Context passed to prefetch functions during the precommit
+ * phase of a navigation. Provides the matched route parameters,
+ * the destination URL, and the Navigation API's precommit
+ * controller for redirects.
+ */
+export interface PrefetchContext {
+  /**
+   * Dynamic route parameters extracted from the matched URL
+   * pattern. For example, a route registered as `/user/:id`
+   * matching `/user/42` produces `{ id: '42' }`.
+   */
+  readonly params: Record<string, string>
+
+  /**
+   * The full destination URL being navigated to. Includes
+   * the pathname, search parameters, and hash. Useful for
+   * constructing query keys or reading search params during
+   * prefetch.
+   */
+  readonly url: URL
+
+  /**
+   * The precommit controller from the Navigation API,
+   * providing `redirect()` to abort the current navigation
+   * and redirect elsewhere, and `addHandler()` to register
+   * additional post-commit handlers. When prefetch is
+   * triggered outside a real navigation (e.g. Link hover),
+   * this is a stub with no-op methods.
+   */
+  readonly controller: NavigationPrecommitController
+}
+
+/**
  * Function invoked during the precommit phase of a navigation.
- * Receives the NavigationPrecommitController to optionally
- * perform redirects or add additional handlers before the
- * URL commits.
+ * Receives a context object with the matched route parameters,
+ * destination URL, and the Navigation API's precommit controller
+ * for redirects or additional handler registration.
  *
- * @param controller - The precommit controller from the
- *   Navigation API, providing `redirect()` and `addHandler()`.
+ * @param context - The prefetch context containing route params,
+ *   destination URL, and the precommit controller.
  * @returns Void or a promise that resolves when prefetching
  *   is complete.
  */
 export type PrefetchFunc = {
-  (controller: NavigationPrecommitController): void | Promise<void>
+  (context: PrefetchContext): void | Promise<void>
 }
 
 /**

@@ -5,7 +5,6 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      reporters: ['tree'],
       setupFiles: './setupTests.ts',
       environment: 'happy-dom',
       coverage: {

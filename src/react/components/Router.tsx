@@ -200,7 +200,12 @@ export function Router(options: RouterProps) {
       return
     }
 
-    const precommitHandler = createPrecommitHandler(match.handler.prefetch)
+    const precommitHandler = createPrecommitHandler({
+      prefetch: match.handler.prefetch,
+      params: match.params,
+      url: new URL(event.destination.url),
+    })
+
     const handler = createHandler(function () {
       setCurrent({
         match,
@@ -226,7 +231,7 @@ export function Router(options: RouterProps) {
 
   const CurrentComponent = current.match.handler.component
   const middlewares = current.match.handler.middlewares
-
+1
   return (
     <TransitionContext value={transition}>
       <NavigationContext value={navigation}>

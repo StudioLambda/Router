@@ -1,6 +1,29 @@
 import { type TransitionFunction, use, useTransition } from 'react'
 import { TransitionContext } from 'router/react:context/TransitionContext'
-import { type PrefetchFunc } from 'router/react:router'
+import { type PrefetchFunc, type PrefetchContext } from 'router/react:router'
+
+/**
+ * Options for creating a precommit handler that forwards
+ * route context to the prefetch function.
+ */
+export interface PrecommitHandlerOptions {
+  /**
+   * The prefetch function from the matched route handler.
+   * When undefined, no precommit handler is created.
+   */
+  readonly prefetch?: PrefetchFunc
+
+  /**
+   * Dynamic route parameters extracted from the matched
+   * URL pattern.
+   */
+  readonly params: Record<string, string>
+
+  /**
+   * The destination URL being navigated to.
+   */
+  readonly url: URL
+}
 
 /**
  * Creates handler functions for the Navigation API's
@@ -35,18 +58,27 @@ export function useNavigationHandlers(
   const [, startTransition] = contextTransition
 
   /**
-   * Creates a precommit handler that receives the
-   * NavigationPrecommitController and forwards it to
-   * the route's prefetch function. Runs before the URL
-   * commits, so no React state transitions are needed here.
+   * Creates a precommit handler that constructs a
+   * `PrefetchContext` from the matched route information
+   * and forwards it to the route's prefetch function.
+   * Runs before the URL commits, so no React state
+   * transitions are needed here.
    */
-  function createPrecommitHandler(prefetch?: PrefetchFunc) {
-    if (prefetch === undefined) {
+  function createPrecommitHandler(options: PrecommitHandlerOptions) {
+    if (options.prefetch === undefined) {
       return undefined
     }
 
+    const prefetch = options.prefetch
+
     return async function (controller: NavigationPrecommitController) {
-      await prefetch(controller)
+      const context: PrefetchContext = {
+        params: options.params,
+        url: options.url,
+        controller,
+      }
+
+      await prefetch(context)
     }
   }
 

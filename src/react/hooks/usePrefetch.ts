@@ -1,6 +1,6 @@
 import { use } from 'react'
 import { MatcherContext } from 'router/react:context/MatcherContext'
-import { type Handler } from 'router/react:router'
+import { type Handler, type PrefetchContext } from 'router/react:router'
 import { type Matcher } from 'router:matcher'
 
 /**
@@ -34,16 +34,17 @@ export function usePrefetch(options?: PrefetchOptions) {
   /**
    * Triggers prefetch for the given URL by matching it against
    * registered routes and calling the route's prefetch function
-   * with a stub controller. Extracts the pathname from the URL
-   * before matching to handle both absolute and relative URLs.
+   * with a context containing the matched params, the parsed
+   * URL, and a stub controller. Extracts the pathname from the
+   * URL before matching to handle both absolute and relative URLs.
    *
    * @param url - The URL or path to prefetch data for.
    * @returns The prefetch promise, or undefined if no prefetch
    *   handler is registered for the matched route.
    */
   return function (url: string) {
-    const pathname = new URL(url, 'http://localhost').pathname
-    const match = matcher.match(pathname)
+    const parsed = new URL(url, 'http://localhost')
+    const match = matcher.match(parsed.pathname)
 
     if (match?.handler.prefetch === undefined) {
       return
@@ -59,6 +60,12 @@ export function usePrefetch(options?: PrefetchOptions) {
       addHandler() {},
     }
 
-    return match.handler.prefetch(stubController)
+    const context: PrefetchContext = {
+      params: match.params,
+      url: parsed,
+      controller: stubController,
+    }
+
+    return match.handler.prefetch(context)
   }
 }

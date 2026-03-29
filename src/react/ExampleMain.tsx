@@ -20,8 +20,8 @@ const router = createRouter(function (route) {
   route('/').render(HelloWorld)
 
   route('/other')
-    .prefetch(function (controller) {
-      console.log('PREFETCHING ROUTE', controller)
+    .prefetch(function ({ params, url, controller }) {
+      console.log('PREFETCHING ROUTE', { params, url, controller })
 
       return new Promise(function (r) {
         setTimeout(r, 2000)

@@ -4,6 +4,7 @@ import {
   type FormHandler,
   type Handler,
   type MiddlewareProps,
+  type PrefetchContext,
   type PrefetchFunc,
 } from 'router/react:router'
 
@@ -269,9 +270,9 @@ function chainPrefetches(
     return prefetches[0]
   }
 
-  return async function (controller: NavigationPrecommitController) {
+  return async function (context: PrefetchContext) {
     for (const fn of prefetches) {
-      await fn(controller)
+      await fn(context)
     }
   }
 }
@@ -410,8 +411,8 @@ function createRouteFactory(
         const handler: Handler = {
           component: RedirectFallback,
           middlewares: resolveMiddlewares(),
-          prefetch: function (controller) {
-            controller.redirect(target)
+          prefetch: function (context) {
+            context.controller.redirect(target)
           },
           scroll: state.scroll,
           focusReset: state.focusReset,

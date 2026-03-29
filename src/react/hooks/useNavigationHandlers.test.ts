@@ -45,7 +45,10 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
 
     onTestFinished(unmount)
 
-    const result = current.createPrecommitHandler()
+    const result = current.createPrecommitHandler({
+      params: {},
+      url: new URL('http://localhost/'),
+    })
 
     expect(result).toBeUndefined()
   })
@@ -65,12 +68,16 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
     onTestFinished(unmount)
 
     const prefetchSpy = vi.fn()
-    const handler = current.createPrecommitHandler(prefetchSpy)
+    const handler = current.createPrecommitHandler({
+      prefetch: prefetchSpy,
+      params: {},
+      url: new URL('http://localhost/'),
+    })
 
     expect(typeof handler).toBe('function')
   })
 
-  it('createPrecommitHandler calls the prefetch function with the controller', async function ({ expect, onTestFinished }) {
+  it('createPrecommitHandler calls the prefetch function with a PrefetchContext', async function ({ expect, onTestFinished }) {
     /**
      * Stub startTransition for the prefetch invocation test.
      */
@@ -85,7 +92,14 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
     onTestFinished(unmount)
 
     const prefetchSpy = vi.fn()
-    const handler = current.createPrecommitHandler(prefetchSpy)!
+    const params = { id: '42' }
+    const url = new URL('http://localhost/user/42')
+
+    const handler = current.createPrecommitHandler({
+      prefetch: prefetchSpy,
+      params,
+      url,
+    })!
 
     const mockController = {
       redirect: vi.fn(),
@@ -94,7 +108,13 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
 
     await handler(mockController)
 
-    expect(prefetchSpy).toHaveBeenCalledWith(mockController)
+    expect(prefetchSpy).toHaveBeenCalledTimes(1)
+
+    const context = prefetchSpy.mock.calls[0][0]
+
+    expect(context.params).toBe(params)
+    expect(context.url).toBe(url)
+    expect(context.controller).toBe(mockController)
   })
 
   it('createHandler returns a function that wraps callback in startTransition', function ({ expect, onTestFinished }) {
