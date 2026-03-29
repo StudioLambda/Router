@@ -37,7 +37,10 @@ describe('useNextMatch', { concurrent: true }, function () {
     expect(result.params).toEqual({})
   })
 
-  it('falls back to notFound component when no route matches', function ({ expect, onTestFinished }) {
+  it('falls back to notFound component when no route matches', function ({
+    expect,
+    onTestFinished,
+  }) {
     const matcher = createMatcher<Handler>()
     const NotFound = createStub()
 
@@ -87,7 +90,10 @@ describe('useNextMatch', { concurrent: true }, function () {
     expect(result.params).toEqual({ id: '42' })
   })
 
-  it('reads matcher from MatcherContext when no option is passed', function ({ expect, onTestFinished }) {
+  it('reads matcher from MatcherContext when no option is passed', function ({
+    expect,
+    onTestFinished,
+  }) {
     const Home = createStub()
     const matcher = createMatcher<Handler>()
 
@@ -105,7 +111,7 @@ describe('useNextMatch', { concurrent: true }, function () {
       function () {
         return useNextMatch()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

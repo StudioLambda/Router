@@ -27,7 +27,7 @@ describe('usePathname', { concurrent: true }, function () {
       function () {
         return usePathname()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

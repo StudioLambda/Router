@@ -24,7 +24,9 @@ function createTestNavigation(url: string): Navigation & EventTarget {
     id: 'test-id',
     index: 0,
     sameDocument: true,
-    getState: function () { return undefined },
+    getState: function () {
+      return undefined
+    },
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
@@ -42,7 +44,9 @@ function createTestNavigation(url: string): Navigation & EventTarget {
         finished: Promise.resolve(entry),
       }
     }),
-    entries: vi.fn(function () { return [entry] }),
+    entries: vi.fn(function () {
+      return [entry]
+    }),
     back: vi.fn(),
     forward: vi.fn(),
     traverseTo: vi.fn(),
@@ -84,7 +88,7 @@ function renderRouter(options: {
         transition: options.transition,
         onNavigateSuccess: options.onNavigateSuccess,
         onNavigateError: options.onNavigateError,
-      }),
+      })
     )
   })
 
@@ -102,7 +106,10 @@ function renderRouter(options: {
 }
 
 describe('Router', { concurrent: true }, function () {
-  it('renders the matched route component for the initial URL', function ({ expect, onTestFinished }) {
+  it('renders the matched route component for the initial URL', function ({
+    expect,
+    onTestFinished,
+  }) {
     const matcher = createMatcher<Handler>()
 
     /**
@@ -293,7 +300,10 @@ describe('Router', { concurrent: true }, function () {
     expect(auth?.textContent).toBe('Protected')
   })
 
-  it('intercepts navigate events and updates the rendered route', function ({ expect, onTestFinished }) {
+  it('intercepts navigate events and updates the rendered route', function ({
+    expect,
+    onTestFinished,
+  }) {
     const matcher = createMatcher<Handler>()
 
     /**
@@ -330,13 +340,13 @@ describe('Router', { concurrent: true }, function () {
      */
     const transition: [boolean, (cb: () => void) => void] = [
       false,
-      function (cb) { cb() },
+      function (cb) {
+        cb()
+      },
     ]
 
     act(function () {
-      root.render(
-        createElement(Router, { navigation, matcher, transition }),
-      )
+      root.render(createElement(Router, { navigation, matcher, transition }))
     })
 
     onTestFinished(function () {
@@ -355,7 +365,7 @@ describe('Router', { concurrent: true }, function () {
      * handler will call event.intercept() with handler and
      * precommitHandler functions that we capture and invoke.
      */
-    const interceptOptions: { handler?: () => Promise<void>, precommitHandler?: Function } = {}
+    const interceptOptions: { handler?: () => Promise<void>; precommitHandler?: Function } = {}
 
     act(function () {
       const event = {
@@ -490,7 +500,10 @@ describe('Router', { concurrent: true }, function () {
     })
   })
 
-  it('calls precommitHandler with prefetch when route has prefetch', function ({ expect, onTestFinished }) {
+  it('calls precommitHandler with prefetch when route has prefetch', function ({
+    expect,
+    onTestFinished,
+  }) {
     const matcher = createMatcher<Handler>()
     const prefetchSpy = vi.fn()
 
@@ -534,7 +547,10 @@ describe('Router', { concurrent: true }, function () {
     })
   })
 
-  it('handles form submissions with a dedicated formHandler', function ({ expect, onTestFinished }) {
+  it('handles form submissions with a dedicated formHandler', function ({
+    expect,
+    onTestFinished,
+  }) {
     const matcher = createMatcher<Handler>()
     const formHandlerSpy = vi.fn()
 
@@ -635,16 +651,17 @@ describe('Router', { concurrent: true }, function () {
     onTestFinished(unmount)
 
     act(function () {
-      navigation.dispatchEvent(
-        new ErrorEvent('navigateerror', { error: new Error('fail') }),
-      )
+      navigation.dispatchEvent(new ErrorEvent('navigateerror', { error: new Error('fail') }))
     })
 
     expect(onNavigateError).toHaveBeenCalledTimes(1)
     expect(onNavigateError.mock.calls[0][0]).toBeInstanceOf(Error)
   })
 
-  it('passes scroll and focusReset options to event.intercept', function ({ expect, onTestFinished }) {
+  it('passes scroll and focusReset options to event.intercept', function ({
+    expect,
+    onTestFinished,
+  }) {
     const matcher = createMatcher<Handler>()
 
     /**
@@ -690,7 +707,10 @@ describe('Router', { concurrent: true }, function () {
     })
   })
 
-  it('extracts pathname from initial URL with query and hash', function ({ expect, onTestFinished }) {
+  it('extracts pathname from initial URL with query and hash', function ({
+    expect,
+    onTestFinished,
+  }) {
     const matcher = createMatcher<Handler>()
     let capturedPathname = ''
 
@@ -716,7 +736,10 @@ describe('Router', { concurrent: true }, function () {
     expect(capturedPathname).toBe('/search')
   })
 
-  it('uses the provided transition prop instead of internal useTransition', function ({ expect, onTestFinished }) {
+  it('uses the provided transition prop instead of internal useTransition', function ({
+    expect,
+    onTestFinished,
+  }) {
     const matcher = createMatcher<Handler>()
     let capturedTransition: ReturnType<typeof import('react').useTransition> | null = null
 
@@ -737,10 +760,7 @@ describe('Router', { concurrent: true }, function () {
      * The isPending value is set to true so we can distinguish
      * it from the internal useTransition which starts as false.
      */
-    const customTransition: [boolean, (cb: () => void) => void] = [
-      true,
-      function (_cb) {},
-    ]
+    const customTransition: [boolean, (cb: () => void) => void] = [true, function (_cb) {}]
 
     const { container, unmount } = renderRouter({
       matcher,

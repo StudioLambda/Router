@@ -31,7 +31,7 @@ describe('useSearchParams', { concurrent: true }, function () {
       function () {
         return useSearchParams()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -42,14 +42,17 @@ describe('useSearchParams', { concurrent: true }, function () {
     expect(searchParams.get('page')).toBe('2')
   })
 
-  it('returns empty search params when URL has no query string', function ({ expect, onTestFinished }) {
+  it('returns empty search params when URL has no query string', function ({
+    expect,
+    onTestFinished,
+  }) {
     const { Wrapper } = createNavigationWrapper('https://example.com/page')
 
     const { current, unmount } = renderHook(
       function () {
         return useSearchParams()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -59,7 +62,10 @@ describe('useSearchParams', { concurrent: true }, function () {
     expect(searchParams.toString()).toBe('')
   })
 
-  it('setter navigates with a record of params using replace by default', function ({ expect, onTestFinished }) {
+  it('setter navigates with a record of params using replace by default', function ({
+    expect,
+    onTestFinished,
+  }) {
     const { navigation, Wrapper } = createNavigationWrapper('https://example.com/page')
 
     const navigateSpy = vi.spyOn(navigation, 'navigate')
@@ -68,7 +74,7 @@ describe('useSearchParams', { concurrent: true }, function () {
       function () {
         return useSearchParams()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -89,7 +95,7 @@ describe('useSearchParams', { concurrent: true }, function () {
       function () {
         return useSearchParams()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -110,7 +116,7 @@ describe('useSearchParams', { concurrent: true }, function () {
       function () {
         return useSearchParams()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -123,10 +129,7 @@ describe('useSearchParams', { concurrent: true }, function () {
       return current
     })
 
-    expect(navigateSpy).toHaveBeenCalledWith(
-      '/page?existing=1&added=2',
-      { history: 'replace' },
-    )
+    expect(navigateSpy).toHaveBeenCalledWith('/page?existing=1&added=2', { history: 'replace' })
   })
 
   it('setter respects custom history option', function ({ expect, onTestFinished }) {
@@ -138,7 +141,7 @@ describe('useSearchParams', { concurrent: true }, function () {
       function () {
         return useSearchParams()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

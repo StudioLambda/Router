@@ -20,7 +20,7 @@ describe('useActiveLinkProps', { concurrent: true }, function () {
       function () {
         return useActiveLinkProps('/about')
       },
-      { wrapper: createPathnameWrapper('/about') },
+      { wrapper: createPathnameWrapper('/about') }
     )
 
     onTestFinished(unmount)
@@ -35,7 +35,7 @@ describe('useActiveLinkProps', { concurrent: true }, function () {
       function () {
         return useActiveLinkProps('/about')
       },
-      { wrapper: createPathnameWrapper('/contact') },
+      { wrapper: createPathnameWrapper('/contact') }
     )
 
     onTestFinished(unmount)
@@ -50,7 +50,7 @@ describe('useActiveLinkProps', { concurrent: true }, function () {
       function () {
         return useActiveLinkProps(undefined)
       },
-      { wrapper: createPathnameWrapper('/about') },
+      { wrapper: createPathnameWrapper('/about') }
     )
 
     onTestFinished(unmount)
@@ -63,7 +63,7 @@ describe('useActiveLinkProps', { concurrent: true }, function () {
       function () {
         return useActiveLinkProps('/users', { exact: false })
       },
-      { wrapper: createPathnameWrapper('/users/42') },
+      { wrapper: createPathnameWrapper('/users/42') }
     )
 
     onTestFinished(unmount)
@@ -77,7 +77,7 @@ describe('useActiveLinkProps', { concurrent: true }, function () {
       function () {
         return useActiveLinkProps('/users')
       },
-      { wrapper: createPathnameWrapper('/users/42') },
+      { wrapper: createPathnameWrapper('/users/42') }
     )
 
     onTestFinished(unmount)
@@ -85,12 +85,15 @@ describe('useActiveLinkProps', { concurrent: true }, function () {
     expect(current.isActive).toBe(false)
   })
 
-  it('prefix match is active when pathname equals href exactly', function ({ expect, onTestFinished }) {
+  it('prefix match is active when pathname equals href exactly', function ({
+    expect,
+    onTestFinished,
+  }) {
     const { current, unmount } = renderHook(
       function () {
         return useActiveLinkProps('/users', { exact: false })
       },
-      { wrapper: createPathnameWrapper('/users') },
+      { wrapper: createPathnameWrapper('/users') }
     )
 
     onTestFinished(unmount)
@@ -98,12 +101,15 @@ describe('useActiveLinkProps', { concurrent: true }, function () {
     expect(current.isActive).toBe(true)
   })
 
-  it('handles href with query string by comparing only pathname', function ({ expect, onTestFinished }) {
+  it('handles href with query string by comparing only pathname', function ({
+    expect,
+    onTestFinished,
+  }) {
     const { current, unmount } = renderHook(
       function () {
         return useActiveLinkProps('/search?q=hello')
       },
-      { wrapper: createPathnameWrapper('/search') },
+      { wrapper: createPathnameWrapper('/search') }
     )
 
     onTestFinished(unmount)

@@ -29,7 +29,7 @@ describe('useNavigation', { concurrent: true }, function () {
       function () {
         return useNavigation()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

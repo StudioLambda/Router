@@ -59,14 +59,15 @@ export interface SetSearchParamsOptions {
  * }
  * ```
  */
-export function useSearchParams(): [URLSearchParams, (updater: SearchParamsUpdater, options?: SetSearchParamsOptions) => NavigationResult] {
+export function useSearchParams(): [
+  URLSearchParams,
+  (updater: SearchParamsUpdater, options?: SetSearchParamsOptions) => NavigationResult,
+] {
   const navigation = useNavigation()
 
   const currentUrl = navigation.currentEntry?.url
 
-  const searchParams = currentUrl
-    ? new URL(currentUrl).searchParams
-    : new URLSearchParams()
+  const searchParams = currentUrl ? new URL(currentUrl).searchParams : new URLSearchParams()
 
   /**
    * Navigates to the current pathname with updated search
@@ -78,13 +79,9 @@ export function useSearchParams(): [URLSearchParams, (updater: SearchParamsUpdat
     const currentEntry = navigation.currentEntry
     const url = new URL(currentEntry?.url ?? '/', 'http://localhost')
 
-    const next = typeof updater === 'function'
-      ? updater(url.searchParams)
-      : updater
+    const next = typeof updater === 'function' ? updater(url.searchParams) : updater
 
-    const nextParams = next instanceof URLSearchParams
-      ? next
-      : new URLSearchParams(next)
+    const nextParams = next instanceof URLSearchParams ? next : new URLSearchParams(next)
 
     const search = nextParams.toString()
     const destination = url.pathname + (search ? '?' + search : '')

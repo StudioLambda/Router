@@ -34,7 +34,7 @@ describe('useIsPending', { concurrent: true }, function () {
       function () {
         return useIsPending()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -62,7 +62,7 @@ describe('useIsPending', { concurrent: true }, function () {
       function () {
         return useIsPending()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

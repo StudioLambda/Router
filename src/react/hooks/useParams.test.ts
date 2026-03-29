@@ -29,7 +29,7 @@ describe('useParams', { concurrent: true }, function () {
       function () {
         return useParams()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

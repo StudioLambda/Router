@@ -28,7 +28,10 @@ describe('usePrefetch', { concurrent: true }, function () {
     expect(typeof current).toBe('function')
   })
 
-  it('calls the matched route prefetch handler with a PrefetchContext', function ({ expect, onTestFinished }) {
+  it('calls the matched route prefetch handler with a PrefetchContext', function ({
+    expect,
+    onTestFinished,
+  }) {
     const prefetchSpy = vi.fn()
     const matcher = createMatcher<Handler>()
 
@@ -70,7 +73,10 @@ describe('usePrefetch', { concurrent: true }, function () {
     expect(result).toBeUndefined()
   })
 
-  it('returns undefined when matched route has no prefetch handler', function ({ expect, onTestFinished }) {
+  it('returns undefined when matched route has no prefetch handler', function ({
+    expect,
+    onTestFinished,
+  }) {
     const matcher = createMatcher<Handler>()
 
     matcher.register('/home', { component: createStub() })
@@ -106,7 +112,10 @@ describe('usePrefetch', { concurrent: true }, function () {
     expect(prefetchSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('reads matcher from MatcherContext when no option is passed', function ({ expect, onTestFinished }) {
+  it('reads matcher from MatcherContext when no option is passed', function ({
+    expect,
+    onTestFinished,
+  }) {
     const prefetchSpy = vi.fn()
     const matcher = createMatcher<Handler>()
 
@@ -126,7 +135,7 @@ describe('usePrefetch', { concurrent: true }, function () {
       function () {
         return usePrefetch()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

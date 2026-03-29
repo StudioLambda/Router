@@ -134,10 +134,7 @@ describe('createRouter', { concurrent: true }, function () {
 
     it('sets both scroll and focusReset together', function ({ expect }) {
       const router = createRouter(function (route) {
-        route('/')
-          .scroll('after-transition')
-          .focusReset('manual')
-          .render(Stub)
+        route('/').scroll('after-transition').focusReset('manual').render(Stub)
       })
 
       const handler = router.match('/')?.handler
@@ -208,10 +205,7 @@ describe('createRouter', { concurrent: true }, function () {
       }
 
       const router = createRouter(function (route) {
-        route('/')
-          .prefetch(first)
-          .prefetch(second)
-          .render(Stub)
+        route('/').prefetch(first).prefetch(second).render(Stub)
       })
 
       const context = createMockContext()
@@ -246,10 +240,7 @@ describe('createRouter', { concurrent: true }, function () {
       const Logger = createMiddleware()
 
       const router = createRouter(function (route) {
-        route('/')
-          .middleware([Auth])
-          .middleware([Logger])
-          .render(Stub)
+        route('/').middleware([Auth]).middleware([Logger]).render(Stub)
       })
 
       const middlewares = router.match('/')?.handler.middlewares
@@ -401,9 +392,7 @@ describe('createRouter', { concurrent: true }, function () {
       router.match('/search')?.handler.prefetch?.(context)
 
       expect(receivedUrl?.search).toBe('?q=test')
-      expect(context.controller.redirect).toHaveBeenCalledWith(
-        '/new-search?q=test',
-      )
+      expect(context.controller.redirect).toHaveBeenCalledWith('/new-search?q=test')
     })
   })
 
@@ -544,9 +533,15 @@ describe('createRouter', { concurrent: true }, function () {
     it('chains prefetches through nested groups', async function ({ expect }) {
       const order: number[] = []
 
-      const first: PrefetchFunc = async function () { order.push(1) }
-      const second: PrefetchFunc = async function () { order.push(2) }
-      const third: PrefetchFunc = async function () { order.push(3) }
+      const first: PrefetchFunc = async function () {
+        order.push(1)
+      }
+      const second: PrefetchFunc = async function () {
+        order.push(2)
+      }
+      const third: PrefetchFunc = async function () {
+        order.push(3)
+      }
 
       const router = createRouter(function (route) {
         const outer = route().prefetch(first).group()

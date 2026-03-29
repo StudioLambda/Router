@@ -20,7 +20,7 @@ describe('useNavigate', { concurrent: true }, function () {
       function () {
         return useNavigate()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -28,7 +28,10 @@ describe('useNavigate', { concurrent: true }, function () {
     expect(typeof current).toBe('function')
   })
 
-  it('delegates to navigation.navigate with correct arguments', function ({ expect, onTestFinished }) {
+  it('delegates to navigation.navigate with correct arguments', function ({
+    expect,
+    onTestFinished,
+  }) {
     const navigation = createMemoryNavigation({ url: 'https://example.com/' })
 
     const navigateSpy = vi.spyOn(navigation, 'navigate')
@@ -44,7 +47,7 @@ describe('useNavigate', { concurrent: true }, function () {
       function () {
         return useNavigate()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

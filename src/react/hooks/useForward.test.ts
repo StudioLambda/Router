@@ -20,7 +20,7 @@ describe('useForward', { concurrent: true }, function () {
       function () {
         return useForward()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -56,7 +56,7 @@ describe('useForward', { concurrent: true }, function () {
       function () {
         return useForward()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

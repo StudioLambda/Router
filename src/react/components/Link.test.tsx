@@ -21,7 +21,7 @@ function createLinkWrapper(pathname: string) {
     return createElement(
       PathnameContext,
       { value: pathname },
-      createElement(MatcherContext, { value: matcher }, children),
+      createElement(MatcherContext, { value: matcher }, children)
     )
   }
 }
@@ -44,11 +44,7 @@ describe('Link', { concurrent: true }, function () {
     })
 
     act(function () {
-      root.render(
-        createElement(Wrapper, null,
-          createElement(Link, { href: '/about' }, 'About'),
-        ),
-      )
+      root.render(createElement(Wrapper, null, createElement(Link, { href: '/about' }, 'About')))
     })
 
     const anchor = container.querySelector('a')
@@ -75,9 +71,7 @@ describe('Link', { concurrent: true }, function () {
 
     act(function () {
       root.render(
-        createElement(Wrapper, null,
-          createElement(Link, { href: '/contact' }, 'Contact'),
-        ),
+        createElement(Wrapper, null, createElement(Link, { href: '/contact' }, 'Contact'))
       )
     })
 
@@ -86,7 +80,10 @@ describe('Link', { concurrent: true }, function () {
     expect(anchor?.getAttribute('href')).toBe('/contact')
   })
 
-  it('adds data-active and aria-current when pathname matches href', function ({ expect, onTestFinished }) {
+  it('adds data-active and aria-current when pathname matches href', function ({
+    expect,
+    onTestFinished,
+  }) {
     const container = document.createElement('div')
 
     document.body.appendChild(container)
@@ -103,11 +100,7 @@ describe('Link', { concurrent: true }, function () {
     })
 
     act(function () {
-      root.render(
-        createElement(Wrapper, null,
-          createElement(Link, { href: '/about' }, 'About'),
-        ),
-      )
+      root.render(createElement(Wrapper, null, createElement(Link, { href: '/about' }, 'About')))
     })
 
     const anchor = container.querySelector('a')
@@ -116,7 +109,10 @@ describe('Link', { concurrent: true }, function () {
     expect(anchor?.getAttribute('aria-current')).toBe('page')
   })
 
-  it('does not add active attributes when pathname does not match', function ({ expect, onTestFinished }) {
+  it('does not add active attributes when pathname does not match', function ({
+    expect,
+    onTestFinished,
+  }) {
     const container = document.createElement('div')
 
     document.body.appendChild(container)
@@ -133,11 +129,7 @@ describe('Link', { concurrent: true }, function () {
     })
 
     act(function () {
-      root.render(
-        createElement(Wrapper, null,
-          createElement(Link, { href: '/about' }, 'About'),
-        ),
-      )
+      root.render(createElement(Wrapper, null, createElement(Link, { href: '/about' }, 'About')))
     })
 
     const anchor = container.querySelector('a')
@@ -164,9 +156,11 @@ describe('Link', { concurrent: true }, function () {
 
     act(function () {
       root.render(
-        createElement(Wrapper, null,
-          createElement(Link, { href: '/page', className: 'nav-link' }, 'Page'),
-        ),
+        createElement(
+          Wrapper,
+          null,
+          createElement(Link, { href: '/page', className: 'nav-link' }, 'Page')
+        )
       )
     })
 
@@ -193,14 +187,20 @@ describe('Link', { concurrent: true }, function () {
 
     act(function () {
       root.render(
-        createElement(Wrapper, null,
-          createElement(Link, {
-            href: '/active',
-            className: function ({ isActive }) {
-              return isActive ? 'is-active' : 'not-active'
+        createElement(
+          Wrapper,
+          null,
+          createElement(
+            Link,
+            {
+              href: '/active',
+              className: function ({ isActive }) {
+                return isActive ? 'is-active' : 'not-active'
+              },
             },
-          }, 'Active Link'),
-        ),
+            'Active Link'
+          )
+        )
       )
     })
 
@@ -227,13 +227,19 @@ describe('Link', { concurrent: true }, function () {
 
     act(function () {
       root.render(
-        createElement(Wrapper, null,
-          createElement(Link, {
-            href: '/test',
-            target: '_blank',
-            rel: 'noopener',
-          }, 'Test'),
-        ),
+        createElement(
+          Wrapper,
+          null,
+          createElement(
+            Link,
+            {
+              href: '/test',
+              target: '_blank',
+              rel: 'noopener',
+            },
+            'Test'
+          )
+        )
       )
     })
 
@@ -243,7 +249,10 @@ describe('Link', { concurrent: true }, function () {
     expect(anchor?.getAttribute('rel')).toBe('noopener')
   })
 
-  it('supports non-exact active matching with activeExact false', function ({ expect, onTestFinished }) {
+  it('supports non-exact active matching with activeExact false', function ({
+    expect,
+    onTestFinished,
+  }) {
     const container = document.createElement('div')
 
     document.body.appendChild(container)
@@ -261,12 +270,18 @@ describe('Link', { concurrent: true }, function () {
 
     act(function () {
       root.render(
-        createElement(Wrapper, null,
-          createElement(Link, {
-            href: '/docs',
-            activeExact: false,
-          }, 'Docs'),
-        ),
+        createElement(
+          Wrapper,
+          null,
+          createElement(
+            Link,
+            {
+              href: '/docs',
+              activeExact: false,
+            },
+            'Docs'
+          )
+        )
       )
     })
 
@@ -293,11 +308,7 @@ describe('Link', { concurrent: true }, function () {
     })
 
     act(function () {
-      root.render(
-        createElement(Wrapper, null,
-          createElement(Link, { href: '/page' }, 'Page'),
-        ),
-      )
+      root.render(createElement(Wrapper, null, createElement(Link, { href: '/page' }, 'Page')))
     })
 
     const anchor = container.querySelector('a')

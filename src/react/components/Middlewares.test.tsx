@@ -6,7 +6,10 @@ import { Middlewares } from './Middlewares'
 import { type MiddlewareProps } from 'router/react:router'
 
 describe('Middlewares', { concurrent: true }, function () {
-  it('renders children directly when no middlewares are provided', function ({ expect, onTestFinished }) {
+  it('renders children directly when no middlewares are provided', function ({
+    expect,
+    onTestFinished,
+  }) {
     const container = document.createElement('div')
 
     document.body.appendChild(container)
@@ -23,9 +26,7 @@ describe('Middlewares', { concurrent: true }, function () {
 
     act(function () {
       root.render(
-        createElement(Middlewares, { value: undefined },
-          createElement('span', null, 'hello'),
-        ),
+        createElement(Middlewares, { value: undefined }, createElement('span', null, 'hello'))
       )
     })
 
@@ -57,9 +58,11 @@ describe('Middlewares', { concurrent: true }, function () {
 
     act(function () {
       root.render(
-        createElement(Middlewares, { value: [WrapperMiddleware] },
-          createElement('span', null, 'inner'),
-        ),
+        createElement(
+          Middlewares,
+          { value: [WrapperMiddleware] },
+          createElement('span', null, 'inner')
+        )
       )
     })
 
@@ -102,9 +105,11 @@ describe('Middlewares', { concurrent: true }, function () {
 
     act(function () {
       root.render(
-        createElement(Middlewares, { value: [OuterMiddleware, InnerMiddleware] },
-          createElement('span', null, 'content'),
-        ),
+        createElement(
+          Middlewares,
+          { value: [OuterMiddleware, InnerMiddleware] },
+          createElement('span', null, 'content')
+        )
       )
     })
 

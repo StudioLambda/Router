@@ -256,13 +256,9 @@ function joinPaths(prefix: string, path: string): string {
     return prefix
   }
 
-  const normalizedPrefix = prefix.endsWith('/')
-    ? prefix.slice(0, -1)
-    : prefix
+  const normalizedPrefix = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix
 
-  const normalizedPath = path.startsWith('/')
-    ? path
-    : '/' + path
+  const normalizedPath = path.startsWith('/') ? path : '/' + path
 
   return normalizedPrefix + normalizedPath
 }
@@ -275,9 +271,7 @@ function joinPaths(prefix: string, path: string): string {
  * @param prefetches - The prefetch functions to chain.
  * @returns A single combined prefetch function, or undefined.
  */
-function chainPrefetches(
-  prefetches: PrefetchFunc[],
-): PrefetchFunc | undefined {
+function chainPrefetches(prefetches: PrefetchFunc[]): PrefetchFunc | undefined {
   if (prefetches.length === 0) {
     return undefined
   }
@@ -312,10 +306,7 @@ function RedirectFallback() {
  * @param inherited - Configuration from parent groups.
  * @returns A `RouteFactory` function.
  */
-function createRouteFactory(
-  matcher: Matcher<Handler>,
-  inherited: InheritedConfig,
-): RouteFactory {
+function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfig): RouteFactory {
   return function route(path?: string): RouteBuilder {
     const state: BuilderState = {
       path,
@@ -340,9 +331,7 @@ function createRouteFactory(
       const fullPath = joinPaths(inherited.prefix, state.path ?? '')
 
       if (fullPath === '') {
-        throw new Error(
-          'cannot register a route without a path or group prefix',
-        )
+        throw new Error('cannot register a route without a path or group prefix')
       }
 
       return fullPath
@@ -369,10 +358,7 @@ function createRouteFactory(
      * @returns The chained prefetch function, or undefined.
      */
     function resolvePrefetches(): PrefetchFunc | undefined {
-      return chainPrefetches([
-        ...inherited.prefetches,
-        ...state.prefetches,
-      ])
+      return chainPrefetches([...inherited.prefetches, ...state.prefetches])
     }
 
     const builder: RouteBuilder = {
@@ -428,9 +414,7 @@ function createRouteFactory(
           component: RedirectFallback,
           middlewares: resolveMiddlewares(),
           prefetch: function (context) {
-            const resolved = typeof target === 'function'
-              ? target(context)
-              : target
+            const resolved = typeof target === 'function' ? target(context) : target
 
             context.controller.redirect(resolved)
           },
@@ -442,27 +426,15 @@ function createRouteFactory(
       },
 
       group() {
-        const childPrefix = joinPaths(
-          inherited.prefix,
-          state.path ?? '',
-        )
+        const childPrefix = joinPaths(inherited.prefix, state.path ?? '')
 
         const childInherited: InheritedConfig = {
           prefix: childPrefix,
-          middlewares: [
-            ...inherited.middlewares,
-            ...state.middlewares,
-          ],
-          prefetches: [
-            ...inherited.prefetches,
-            ...state.prefetches,
-          ],
+          middlewares: [...inherited.middlewares, ...state.middlewares],
+          prefetches: [...inherited.prefetches, ...state.prefetches],
         }
 
-        return createRouteFactory(
-          matcher,
-          childInherited,
-        )
+        return createRouteFactory(matcher, childInherited)
       },
     }
 
@@ -510,9 +482,7 @@ function createRouteFactory(
  * <Router matcher={router} />
  * ```
  */
-export function createRouter(
-  callback: (route: RouteFactory) => void,
-): Matcher<Handler> {
+export function createRouter(callback: (route: RouteFactory) => void): Matcher<Handler> {
   const matcher = createMatcher<Handler>()
 
   const rootInherited: InheritedConfig = {

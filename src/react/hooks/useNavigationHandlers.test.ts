@@ -13,7 +13,10 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
     }).toThrow('useNavigationHandlers requires a <Router> or <TransitionContext> provider')
   })
 
-  it('returns createPrecommitHandler and createHandler functions', function ({ expect, onTestFinished }) {
+  it('returns createPrecommitHandler and createHandler functions', function ({
+    expect,
+    onTestFinished,
+  }) {
     /**
      * Stub startTransition for testing handler creation.
      */
@@ -31,7 +34,10 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
     expect(typeof current.createHandler).toBe('function')
   })
 
-  it('createPrecommitHandler returns undefined when no prefetch is given', function ({ expect, onTestFinished }) {
+  it('createPrecommitHandler returns undefined when no prefetch is given', function ({
+    expect,
+    onTestFinished,
+  }) {
     /**
      * Stub startTransition for the undefined prefetch test.
      */
@@ -53,7 +59,10 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
     expect(result).toBeUndefined()
   })
 
-  it('createPrecommitHandler returns a function when prefetch is given', function ({ expect, onTestFinished }) {
+  it('createPrecommitHandler returns a function when prefetch is given', function ({
+    expect,
+    onTestFinished,
+  }) {
     /**
      * Stub startTransition for the prefetch test.
      */
@@ -77,7 +86,10 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
     expect(typeof handler).toBe('function')
   })
 
-  it('createPrecommitHandler calls the prefetch function with a PrefetchContext', async function ({ expect, onTestFinished }) {
+  it('createPrecommitHandler calls the prefetch function with a PrefetchContext', async function ({
+    expect,
+    onTestFinished,
+  }) {
     /**
      * Stub startTransition for the prefetch invocation test.
      */
@@ -117,7 +129,10 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
     expect(context.controller).toBe(mockController)
   })
 
-  it('createHandler returns a function that wraps callback in startTransition', function ({ expect, onTestFinished }) {
+  it('createHandler returns a function that wraps callback in startTransition', function ({
+    expect,
+    onTestFinished,
+  }) {
     const transitionCalls: TransitionFunction[] = []
 
     /**
@@ -146,7 +161,10 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
     expect(transitionCalls).toHaveLength(1)
   })
 
-  it('reads transition from TransitionContext when not passed directly', function ({ expect, onTestFinished }) {
+  it('reads transition from TransitionContext when not passed directly', function ({
+    expect,
+    onTestFinished,
+  }) {
     /**
      * Stub startTransition for the context-based test.
      */
@@ -166,7 +184,7 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
       function () {
         return useNavigationHandlers()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -175,7 +193,10 @@ describe('useNavigationHandlers', { concurrent: true }, function () {
     expect(typeof current.createHandler).toBe('function')
   })
 
-  it('createHandler rejects the promise when the callback throws', async function ({ expect, onTestFinished }) {
+  it('createHandler rejects the promise when the callback throws', async function ({
+    expect,
+    onTestFinished,
+  }) {
     /**
      * Custom startTransition that immediately invokes the
      * callback so errors propagate synchronously through

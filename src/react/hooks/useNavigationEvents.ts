@@ -45,10 +45,7 @@ export interface NavigationEventHandlers {
  * @param handlers - Callbacks for each navigation lifecycle
  *   event. All are optional.
  */
-export function useNavigationEvents(
-  navigation: Navigation,
-  handlers: NavigationEventHandlers,
-) {
+export function useNavigationEvents(navigation: Navigation, handlers: NavigationEventHandlers) {
   /**
    * Stable wrapper for the navigate event callback. Reads
    * the latest `onNavigate` handler on each invocation
@@ -93,6 +90,6 @@ export function useNavigationEvents(
         navigation.removeEventListener('navigateerror', onError)
       }
     },
-    [navigation],
+    [navigation]
   )
 }

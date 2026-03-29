@@ -36,13 +36,10 @@ function renderPrefetchEffect(options: {
   const matcher = createMatcher<Handler>()
 
   if (options.href !== undefined) {
-    matcher.register(
-      new URL(options.href, 'http://localhost').pathname,
-      {
-        component: createStub(),
-        prefetch: options.prefetch,
-      },
-    )
+    matcher.register(new URL(options.href, 'http://localhost').pathname, {
+      component: createStub(),
+      prefetch: options.prefetch,
+    })
   }
 
   const container = document.createElement('div')
@@ -68,7 +65,7 @@ function renderPrefetchEffect(options: {
     })
 
     return createElement('div', {
-      ref: function (el: HTMLDivElement | null) {
+      'ref': function (el: HTMLDivElement | null) {
         ref.current = el
         targetElement = el
       },
@@ -196,7 +193,10 @@ describe('usePrefetchEffect', { concurrent: true }, function () {
     disconnectSpy.mockRestore()
   })
 
-  it('triggers prefetch when the element enters the viewport', function ({ expect, onTestFinished }) {
+  it('triggers prefetch when the element enters the viewport', function ({
+    expect,
+    onTestFinished,
+  }) {
     let observerCallback: IntersectionObserverCallback | null = null
 
     /**
@@ -205,16 +205,16 @@ describe('usePrefetchEffect', { concurrent: true }, function () {
      */
     const OriginalObserver = IntersectionObserver
 
-    vi.stubGlobal('IntersectionObserver', function (
-      this: IntersectionObserver,
-      cb: IntersectionObserverCallback,
-    ) {
-      observerCallback = cb
+    vi.stubGlobal(
+      'IntersectionObserver',
+      function (this: IntersectionObserver, cb: IntersectionObserverCallback) {
+        observerCallback = cb
 
-      const instance = new OriginalObserver(cb)
+        const instance = new OriginalObserver(cb)
 
-      return instance
-    })
+        return instance
+      }
+    )
 
     const prefetchSpy = vi.fn()
 
@@ -238,26 +238,29 @@ describe('usePrefetchEffect', { concurrent: true }, function () {
     const mockEntry = { isIntersecting: true } as IntersectionObserverEntry
     const mockObserver = { disconnect: vi.fn() } as unknown as IntersectionObserver
 
-    observerCallback!([ mockEntry ], mockObserver)
+    observerCallback!([mockEntry], mockObserver)
 
     expect(prefetchSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('disconnects observer after first intersection when once is true', function ({ expect, onTestFinished }) {
+  it('disconnects observer after first intersection when once is true', function ({
+    expect,
+    onTestFinished,
+  }) {
     let observerCallback: IntersectionObserverCallback | null = null
 
     const OriginalObserver = IntersectionObserver
 
-    vi.stubGlobal('IntersectionObserver', function (
-      this: IntersectionObserver,
-      cb: IntersectionObserverCallback,
-    ) {
-      observerCallback = cb
+    vi.stubGlobal(
+      'IntersectionObserver',
+      function (this: IntersectionObserver, cb: IntersectionObserverCallback) {
+        observerCallback = cb
 
-      const instance = new OriginalObserver(cb)
+        const instance = new OriginalObserver(cb)
 
-      return instance
-    })
+        return instance
+      }
+    )
 
     const prefetchSpy = vi.fn()
 
@@ -277,26 +280,29 @@ describe('usePrefetchEffect', { concurrent: true }, function () {
     const mockEntry = { isIntersecting: true } as IntersectionObserverEntry
     const mockObserver = { disconnect: disconnectSpy } as unknown as IntersectionObserver
 
-    observerCallback!([ mockEntry ], mockObserver)
+    observerCallback!([mockEntry], mockObserver)
 
     expect(disconnectSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('does not disconnect observer after intersection when once is false', function ({ expect, onTestFinished }) {
+  it('does not disconnect observer after intersection when once is false', function ({
+    expect,
+    onTestFinished,
+  }) {
     let observerCallback: IntersectionObserverCallback | null = null
 
     const OriginalObserver = IntersectionObserver
 
-    vi.stubGlobal('IntersectionObserver', function (
-      this: IntersectionObserver,
-      cb: IntersectionObserverCallback,
-    ) {
-      observerCallback = cb
+    vi.stubGlobal(
+      'IntersectionObserver',
+      function (this: IntersectionObserver, cb: IntersectionObserverCallback) {
+        observerCallback = cb
 
-      const instance = new OriginalObserver(cb)
+        const instance = new OriginalObserver(cb)
 
-      return instance
-    })
+        return instance
+      }
+    )
 
     const prefetchSpy = vi.fn()
 
@@ -316,27 +322,30 @@ describe('usePrefetchEffect', { concurrent: true }, function () {
     const mockEntry = { isIntersecting: true } as IntersectionObserverEntry
     const mockObserver = { disconnect: disconnectSpy } as unknown as IntersectionObserver
 
-    observerCallback!([ mockEntry ], mockObserver)
+    observerCallback!([mockEntry], mockObserver)
 
     expect(prefetchSpy).toHaveBeenCalledTimes(1)
     expect(disconnectSpy).not.toHaveBeenCalled()
   })
 
-  it('skips prefetch when intersection entry is not intersecting', function ({ expect, onTestFinished }) {
+  it('skips prefetch when intersection entry is not intersecting', function ({
+    expect,
+    onTestFinished,
+  }) {
     let observerCallback: IntersectionObserverCallback | null = null
 
     const OriginalObserver = IntersectionObserver
 
-    vi.stubGlobal('IntersectionObserver', function (
-      this: IntersectionObserver,
-      cb: IntersectionObserverCallback,
-    ) {
-      observerCallback = cb
+    vi.stubGlobal(
+      'IntersectionObserver',
+      function (this: IntersectionObserver, cb: IntersectionObserverCallback) {
+        observerCallback = cb
 
-      const instance = new OriginalObserver(cb)
+        const instance = new OriginalObserver(cb)
 
-      return instance
-    })
+        return instance
+      }
+    )
 
     const prefetchSpy = vi.fn()
 
@@ -354,7 +363,7 @@ describe('usePrefetchEffect', { concurrent: true }, function () {
     const mockEntry = { isIntersecting: false } as IntersectionObserverEntry
     const mockObserver = { disconnect: vi.fn() } as unknown as IntersectionObserver
 
-    observerCallback!([ mockEntry ], mockObserver)
+    observerCallback!([mockEntry], mockObserver)
 
     expect(prefetchSpy).not.toHaveBeenCalled()
   })

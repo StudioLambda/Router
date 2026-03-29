@@ -30,7 +30,7 @@ describe('useNavigationSignal', { concurrent: true }, function () {
       function () {
         return useNavigationSignal()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

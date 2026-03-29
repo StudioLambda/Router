@@ -46,9 +46,7 @@ export interface PrecommitHandlerOptions {
  * @throws When no transition tuple is provided and the
  *   hook is used outside a TransitionContext provider.
  */
-export function useNavigationHandlers(
-  transition?: ReturnType<typeof useTransition>,
-) {
+export function useNavigationHandlers(transition?: ReturnType<typeof useTransition>) {
   const contextTransition = transition ?? use(TransitionContext)
 
   if (contextTransition === null) {

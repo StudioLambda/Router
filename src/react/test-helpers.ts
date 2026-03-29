@@ -51,10 +51,7 @@ export interface RenderHookOptions {
  * @param options - Optional wrapper for context providers.
  * @returns The hook result and an unmount function.
  */
-export function renderHook<T>(
-  hook: () => T,
-  options?: RenderHookOptions,
-): RenderHookResult<T> {
+export function renderHook<T>(hook: () => T, options?: RenderHookOptions): RenderHookResult<T> {
   const result: { current: T } = { current: undefined as T }
   const container = document.createElement('div')
 

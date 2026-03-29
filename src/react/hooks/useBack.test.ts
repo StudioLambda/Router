@@ -20,7 +20,7 @@ describe('useBack', { concurrent: true }, function () {
       function () {
         return useBack()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)
@@ -56,7 +56,7 @@ describe('useBack', { concurrent: true }, function () {
       function () {
         return useBack()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

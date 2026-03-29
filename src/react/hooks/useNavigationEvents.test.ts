@@ -18,7 +18,9 @@ function createMockNavigation(): Navigation & EventTarget {
     canGoForward: false,
     transition: null,
     navigate: vi.fn(),
-    entries: vi.fn(function () { return [] }),
+    entries: vi.fn(function () {
+      return []
+    }),
     back: vi.fn(),
     forward: vi.fn(),
     traverseTo: vi.fn(),
@@ -28,7 +30,10 @@ function createMockNavigation(): Navigation & EventTarget {
 }
 
 describe('useNavigationEvents', { concurrent: true }, function () {
-  it('subscribes to navigate events and forwards them to the handler', function ({ expect, onTestFinished }) {
+  it('subscribes to navigate events and forwards them to the handler', function ({
+    expect,
+    onTestFinished,
+  }) {
     const navigation = createMockNavigation()
     const onNavigate = vi.fn()
 
@@ -61,7 +66,10 @@ describe('useNavigationEvents', { concurrent: true }, function () {
     expect(onNavigateSuccess).toHaveBeenCalledTimes(1)
   })
 
-  it('subscribes to navigateerror events and extracts the error', function ({ expect, onTestFinished }) {
+  it('subscribes to navigateerror events and extracts the error', function ({
+    expect,
+    onTestFinished,
+  }) {
     const navigation = createMockNavigation()
     const onNavigateError = vi.fn()
 

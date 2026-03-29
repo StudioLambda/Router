@@ -27,7 +27,7 @@ describe('useNavigationType', { concurrent: true }, function () {
       function () {
         return useNavigationType()
       },
-      { wrapper: Wrapper },
+      { wrapper: Wrapper }
     )
 
     onTestFinished(unmount)

@@ -73,10 +73,7 @@ export interface PrefetchEffectOptions {
  * }
  * ```
  */
-export function usePrefetchEffect(
-  ref: RefObject<Element | null>,
-  options: PrefetchEffectOptions,
-) {
+export function usePrefetchEffect(ref: RefObject<Element | null>, options: PrefetchEffectOptions) {
   const { href, on, once = true, matcher } = options
   const prefetchRoute = usePrefetch({ matcher })
 
@@ -97,7 +94,7 @@ export function usePrefetchEffect(
       if (once) {
         observer.disconnect()
       }
-    },
+    }
   )
 
   /**
@@ -147,6 +144,6 @@ export function usePrefetchEffect(
         }
       }
     },
-    [on, once, href],
+    [on, once, href]
   )
 }

@@ -110,17 +110,7 @@ export function Link({
 
   usePrefetchEffect(ref, { href, on: prefetch, once, matcher })
 
-  const resolvedClassName = typeof className === 'function'
-    ? className({ isActive })
-    : className
+  const resolvedClassName = typeof className === 'function' ? className({ isActive }) : className
 
-  return (
-    <a
-      ref={ref}
-      href={href}
-      className={resolvedClassName}
-      {...activeProps}
-      {...props}
-    />
-  )
+  return <a ref={ref} href={href} className={resolvedClassName} {...activeProps} {...props} />
 }

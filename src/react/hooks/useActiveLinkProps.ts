@@ -76,7 +76,7 @@ export interface ActiveLinkProps {
  */
 export function useActiveLinkProps(
   href: string | undefined,
-  options?: ActiveLinkOptions,
+  options?: ActiveLinkOptions
 ): { isActive: boolean; props: ActiveLinkProps } {
   const currentPathname = use(PathnameContext)
   const isExact = options?.exact ?? true
@@ -109,7 +109,7 @@ export function useActiveLinkProps(
 function isActiveHref(
   href: string | undefined,
   currentPathname: string,
-  isExact: boolean,
+  isExact: boolean
 ): boolean {
   if (href === undefined) {
     return false
@@ -121,6 +121,5 @@ function isActiveHref(
     return linkPathname === currentPathname
   }
 
-  return currentPathname === linkPathname
-    || currentPathname.startsWith(linkPathname + '/')
+  return currentPathname === linkPathname || currentPathname.startsWith(linkPathname + '/')
 }
