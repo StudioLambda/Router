@@ -231,7 +231,7 @@ export function Router(options: RouterProps) {
 
   const CurrentComponent = current.match.handler.component
   const middlewares = current.match.handler.middlewares
-1
+
   return (
     <TransitionContext value={transition}>
       <NavigationContext value={navigation}>
