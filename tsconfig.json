@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [{ "path": "./src/router" }, { "path": "./src/react" }],
+  "compilerOptions": {
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "router:*": ["src/router/*"],
+      "router/react:*": ["./src/react/*"]
+    }
+  }
+}
