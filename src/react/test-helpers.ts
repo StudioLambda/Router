@@ -70,7 +70,7 @@ export function renderHook<T>(hook: () => T, options?: RenderHookOptions): Rende
   }
 
   const element = options?.wrapper
-    ? createElement(options.wrapper, { children: createElement(TestComponent) })
+    ? createElement(options.wrapper, null, createElement(TestComponent))
     : createElement(TestComponent)
 
   act(function () {

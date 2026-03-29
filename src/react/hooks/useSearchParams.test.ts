@@ -123,10 +123,10 @@ describe('useSearchParams', { concurrent: true }, function () {
 
     const [, setSearchParams] = current
 
-    setSearchParams(function (current) {
-      current.set('added', '2')
+    setSearchParams(function (params) {
+      params.set('added', '2')
 
-      return current
+      return params
     })
 
     expect(navigateSpy).toHaveBeenCalledWith('/page?existing=1&added=2', { history: 'replace' })

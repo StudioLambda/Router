@@ -144,6 +144,6 @@ export function usePrefetchEffect(ref: RefObject<Element | null>, options: Prefe
         }
       }
     },
-    [on, once, href]
+    [on, once, href, ref]
   )
 }
