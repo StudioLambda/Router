@@ -1,0 +1,8 @@
+[changelog]
+header = """
+# Changelog\n
+"""
+
+[git]
+tag_pattern = "v[0-9].*"
+filter_commits = true

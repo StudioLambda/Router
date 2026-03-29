@@ -11,5 +11,5 @@
   "semi": false,
   "quoteProps": "consistent",
   "sortPackageJson": false,
-  "ignorePatterns": []
+  "ignorePatterns": ["CHANGELOG.md"]
 }
