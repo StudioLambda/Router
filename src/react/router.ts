@@ -104,6 +104,24 @@ export type PrefetchFunc = {
 }
 
 /**
+ * Target for a redirect route. Can be a static absolute path
+ * string, or a callback that receives the prefetch context and
+ * returns the path to redirect to. The callback form enables
+ * dynamic redirects that use matched route parameters or the
+ * destination URL to compute the target.
+ *
+ * @example
+ * ```ts
+ * // Static redirect
+ * route('/old').redirect('/new')
+ *
+ * // Dynamic redirect using route params
+ * route('/old-user/:id').redirect(({ params }) => `/user/${params.id}`)
+ * ```
+ */
+export type RedirectTarget = string | ((context: PrefetchContext) => string)
+
+/**
  * Handler invoked when a form submission navigation matches
  * this route. Receives the submitted FormData and the original
  * NavigateEvent for full access to the navigation context.

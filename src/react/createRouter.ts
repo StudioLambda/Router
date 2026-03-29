@@ -6,6 +6,7 @@ import {
   type MiddlewareProps,
   type PrefetchContext,
   type PrefetchFunc,
+  type RedirectTarget,
 } from 'router/react:router'
 
 /**
@@ -175,14 +176,29 @@ export interface RouteBuilder {
    * before the URL commits, avoiding any component render
    * or visual flash.
    *
-   * The target path is absolute and is NOT prefixed by
-   * parent groups.
+   * The target can be a static absolute path string, or a
+   * callback that receives the prefetch context and returns
+   * the path. The callback form enables dynamic redirects
+   * that carry route parameters to the new location.
    *
-   * @param target - The absolute path to redirect to.
+   * The resolved target path is absolute and is NOT prefixed
+   * by parent groups.
+   *
+   * @param target - The redirect target: a static path or a
+   *   callback receiving `PrefetchContext` and returning one.
    * @throws When no path was provided to the `route()` call
    *   and no group prefix exists.
+   *
+   * @example
+   * ```ts
+   * // Static redirect
+   * route('/old').redirect('/new')
+   *
+   * // Dynamic redirect using route params
+   * route('/old-user/:id').redirect(({ params }) => `/user/${params.id}`)
+   * ```
    */
-  redirect(target: string): void
+  redirect(target: RedirectTarget): void
 
   /**
    * Terminal method that creates a nested route scope.
@@ -412,7 +428,11 @@ function createRouteFactory(
           component: RedirectFallback,
           middlewares: resolveMiddlewares(),
           prefetch: function (context) {
-            context.controller.redirect(target)
+            const resolved = typeof target === 'function'
+              ? target(context)
+              : target
+
+            context.controller.redirect(resolved)
           },
           scroll: state.scroll,
           focusReset: state.focusReset,

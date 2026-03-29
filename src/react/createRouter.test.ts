@@ -316,6 +316,95 @@ describe('createRouter', { concurrent: true }, function () {
 
       expect(context.controller.redirect).toHaveBeenCalledWith('/new-page')
     })
+
+    it('accepts a callback that receives the prefetch context', function ({ expect }) {
+      const redirectFn = vi.fn(function () {
+        return '/resolved'
+      })
+
+      const router = createRouter(function (route) {
+        route('/old').redirect(redirectFn)
+      })
+
+      const context = createMockContext()
+
+      router.match('/old')?.handler.prefetch?.(context)
+
+      expect(redirectFn).toHaveBeenCalledWith(context)
+      expect(context.controller.redirect).toHaveBeenCalledWith('/resolved')
+    })
+
+    it('resolves dynamic params in a callback redirect', function ({ expect }) {
+      const router = createRouter(function (route) {
+        route('/old-user/:id').redirect(function ({ params }) {
+          return `/user/${params.id}`
+        })
+      })
+
+      const context: PrefetchContext = {
+        params: { id: '42' },
+        url: new URL('http://localhost/old-user/42'),
+        controller: {
+          redirect: vi.fn(),
+          addHandler: vi.fn(),
+        } as unknown as NavigationPrecommitController,
+      }
+
+      router.match('/old-user/42')?.handler.prefetch?.(context)
+
+      expect(context.controller.redirect).toHaveBeenCalledWith('/user/42')
+    })
+
+    it('resolves a callback redirect inside a group', function ({ expect }) {
+      const router = createRouter(function (route) {
+        const app = route('/app').group()
+
+        app('/old/:slug').redirect(function ({ params }) {
+          return `/new/${params.slug}`
+        })
+      })
+
+      const context: PrefetchContext = {
+        params: { slug: 'hello' },
+        url: new URL('http://localhost/app/old/hello'),
+        controller: {
+          redirect: vi.fn(),
+          addHandler: vi.fn(),
+        } as unknown as NavigationPrecommitController,
+      }
+
+      router.match('/app/old/hello')?.handler.prefetch?.(context)
+
+      expect(context.controller.redirect).toHaveBeenCalledWith('/new/hello')
+    })
+
+    it('passes the destination URL to a callback redirect', function ({ expect }) {
+      let receivedUrl: URL | undefined
+
+      const router = createRouter(function (route) {
+        route('/search').redirect(function ({ url }) {
+          receivedUrl = url
+
+          return `/new-search${url.search}`
+        })
+      })
+
+      const context: PrefetchContext = {
+        params: {},
+        url: new URL('http://localhost/search?q=test'),
+        controller: {
+          redirect: vi.fn(),
+          addHandler: vi.fn(),
+        } as unknown as NavigationPrecommitController,
+      }
+
+      router.match('/search')?.handler.prefetch?.(context)
+
+      expect(receivedUrl?.search).toBe('?q=test')
+      expect(context.controller.redirect).toHaveBeenCalledWith(
+        '/new-search?q=test',
+      )
+    })
   })
 
   describe('groups', { concurrent: true }, function () {
