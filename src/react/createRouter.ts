@@ -412,14 +412,11 @@ function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfi
 
         const handler: Handler = {
           component: RedirectFallback,
-          middlewares: resolveMiddlewares(),
           prefetch: function (context) {
             const resolved = typeof target === 'function' ? target(context) : target
 
             context.controller.redirect(resolved)
           },
-          scroll: state.scroll,
-          focusReset: state.focusReset,
         }
 
         matcher.register(fullPath, handler)

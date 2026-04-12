@@ -49,6 +49,6 @@ export function useNextMatch(options?: NextMatchOptions) {
       return fallbackResolved
     }
 
-    return matcher.match(new URL(destination).pathname) ?? fallbackResolved
+    return matcher.match(new URL(destination, 'http://localhost').pathname) ?? fallbackResolved
   }
 }

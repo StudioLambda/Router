@@ -175,5 +175,103 @@ describe('router', function () {
       expect(route).not.toBeNull()
       expect(route?.params).toStrictEqual({ id: '42', path: 'docs/readme.md' })
     })
+
+    it('matches a route with handler value 0', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/zero', 0)
+
+      const route = router.match('/zero')
+
+      expect(route).not.toBeNull()
+      expect(route?.handler).toBe(0)
+    })
+
+    it('matches a route with handler value empty string', function ({ expect }) {
+      const router = createMatcher<string>()
+
+      router.register('/empty', '')
+
+      const route = router.match('/empty')
+
+      expect(route).not.toBeNull()
+      expect(route?.handler).toBe('')
+    })
+
+    it('matches a route with handler value false', function ({ expect }) {
+      const router = createMatcher<boolean>()
+
+      router.register('/false', false)
+
+      const route = router.match('/false')
+
+      expect(route).not.toBeNull()
+      expect(route?.handler).toBe(false)
+    })
+
+    it('matches a wildcard route with handler value 0', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/files/*path', 0)
+
+      const route = router.match('/files/readme.md')
+
+      expect(route).not.toBeNull()
+      expect(route?.handler).toBe(0)
+      expect(route?.params).toStrictEqual({ path: 'readme.md' })
+    })
+
+    it('matches root handler', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/', 1)
+
+      const route = router.match('/')
+
+      expect(route).not.toBeNull()
+      expect(route?.handler).toBe(1)
+    })
+  })
+
+  describe('param name conflicts', function () {
+    it('throws on conflicting dynamic param names at the same level', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/user/:id/profile', 1)
+
+      expect(function () {
+        router.register('/user/:name/settings', 2)
+      }).toThrow('conflicting dynamic param name')
+    })
+
+    it('throws on conflicting wildcard param names at the same level', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/files/*path', 1)
+
+      expect(function () {
+        router.register('/files/*filepath', 2)
+      }).toThrow('conflicting wildcard param name')
+    })
+
+    it('allows the same dynamic param name at the same level', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/user/:id/profile', 1)
+
+      expect(function () {
+        router.register('/user/:id/settings', 2)
+      }).not.toThrow()
+    })
+
+    it('allows the same wildcard param name at the same level', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/files/*path', 1)
+
+      expect(function () {
+        router.register('/other/*path', 2)
+      }).not.toThrow()
+    })
   })
 })

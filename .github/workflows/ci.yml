@@ -11,8 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
   check:
@@ -73,6 +72,10 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     needs: [build]
+
+    permissions:
+      contents: write
+      id-token: write
 
     # Only release on push to main, not on PRs
     if: ${{ github.event_name == 'push' }}
