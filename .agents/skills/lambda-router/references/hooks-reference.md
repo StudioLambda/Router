@@ -34,7 +34,7 @@ Returns dynamic route parameters extracted from the URL pattern.
 ```tsx
 // Route: /user/:id
 function UserPage() {
-  const { id } = useParams()  // { id: "42" } for /user/42
+  const { id } = useParams() // { id: "42" } for /user/42
   return <h1>User {id}</h1>
 }
 ```
@@ -53,7 +53,7 @@ Returns the current URL pathname (without query string or hash).
 
 ```tsx
 function Breadcrumb() {
-  const pathname = usePathname()  // "/user/42"
+  const pathname = usePathname() // "/user/42"
   return <span>{pathname}</span>
 }
 ```
@@ -71,7 +71,7 @@ type SearchParamsUpdater =
   | ((current: URLSearchParams) => URLSearchParams | Record<string, string>)
 
 interface SetSearchParamsOptions {
-  history?: NavigationHistoryBehavior  // default: "replace"
+  history?: NavigationHistoryBehavior // default: "replace"
 }
 ```
 
@@ -80,7 +80,7 @@ Reads search params from React state (concurrent-safe, not from mutable `current
 ```tsx
 function FilterPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const sort = searchParams.get("sort") ?? "newest"
+  const sort = searchParams.get('sort') ?? 'newest'
 
   function updateSort(value: string) {
     // Record form (replaces all params)
@@ -97,7 +97,7 @@ function FilterPage() {
 
   function pushToHistory() {
     // Push instead of replace
-    setSearchParams({ sort: "oldest" }, { history: "push" })
+    setSearchParams({ sort: 'oldest' }, { history: 'push' })
   }
 }
 ```
@@ -118,7 +118,7 @@ function LogoutButton() {
 
   function handleLogout() {
     clearSession()
-    navigate("/login", { history: "replace" })
+    navigate('/login', { history: 'replace' })
   }
 
   return <button onClick={handleLogout}>Logout</button>
@@ -148,11 +148,14 @@ Returns the type of the current navigation: `"push"`, `"replace"`, `"reload"`, o
 ```tsx
 function PageTracker() {
   const type = useNavigationType()
-  useEffect(function () {
-    if (type === "push") {
-      analytics.trackPageView()
-    }
-  }, [type])
+  useEffect(
+    function () {
+      if (type === 'push') {
+        analytics.trackPageView()
+      }
+    },
+    [type]
+  )
 }
 ```
 
@@ -171,15 +174,20 @@ function DataLoader() {
   const signal = useNavigationSignal()
   const [data, setData] = useState(null)
 
-  useEffect(function () {
-    if (!signal) return
-    fetch("/api/data", { signal })
-      .then(function (res) { return res.json() })
-      .then(setData)
-      .catch(function (error) {
-        if (error.name !== "AbortError") throw error
-      })
-  }, [signal])
+  useEffect(
+    function () {
+      if (!signal) return
+      fetch('/api/data', { signal })
+        .then(function (res) {
+          return res.json()
+        })
+        .then(setData)
+        .catch(function (error) {
+          if (error.name !== 'AbortError') throw error
+        })
+    },
+    [signal]
+  )
 }
 ```
 
@@ -207,7 +215,7 @@ function GlobalLoader() {
 ```ts
 interface UseBackResult {
   back: (options?: NavigationOptions) => NavigationResult
-  canGoBack: boolean  // reactive, updates on currententrychange
+  canGoBack: boolean // reactive, updates on currententrychange
 }
 
 function useBack(): UseBackResult
@@ -217,7 +225,11 @@ function useBack(): UseBackResult
 function BackButton() {
   const { back, canGoBack } = useBack()
   return (
-    <button onClick={function () { back() }} disabled={!canGoBack}>
+    <button
+      onClick={function () {
+        back()
+      }}
+      disabled={!canGoBack}>
       Back
     </button>
   )
@@ -231,7 +243,7 @@ function BackButton() {
 ```ts
 interface UseForwardResult {
   forward: (options?: NavigationOptions) => NavigationResult
-  canGoForward: boolean  // reactive
+  canGoForward: boolean // reactive
 }
 
 function useForward(): UseForwardResult
@@ -245,7 +257,7 @@ Mirror of `useBack` for forward navigation.
 
 ```ts
 interface PrefetchOptions {
-  matcher?: Matcher<Handler>  // override context matcher
+  matcher?: Matcher<Handler> // override context matcher
 }
 
 function usePrefetch(options?: PrefetchOptions): (url: string) => void | Promise<void> | undefined
@@ -259,7 +271,10 @@ function PreloadButton({ href }: { href: string }) {
   const prefetch = usePrefetch()
 
   return (
-    <button onMouseEnter={function () { prefetch(href) }}>
+    <button
+      onMouseEnter={function () {
+        prefetch(href)
+      }}>
       Go to {href}
     </button>
   )
@@ -273,12 +288,12 @@ Use `clearPrefetchCache(matcher)` after logout or cache invalidation to allow re
 ## usePrefetchEffect
 
 ```ts
-type PrefetchStrategy = "viewport" | "hover"
+type PrefetchStrategy = 'viewport' | 'hover'
 
 interface PrefetchEffectOptions {
   href?: string
   on?: PrefetchStrategy
-  once?: boolean           // default: true
+  once?: boolean // default: true
   matcher?: Matcher<Handler>
 }
 
@@ -294,7 +309,7 @@ Attach prefetch to a DOM element. Used internally by `<Link>`, but available for
 ```tsx
 function Card({ href }: { href: string }) {
   const ref = useRef<HTMLDivElement>(null)
-  usePrefetchEffect(ref, { href, on: "viewport" })
+  usePrefetchEffect(ref, { href, on: 'viewport' })
   return <div ref={ref}>...</div>
 }
 ```
@@ -308,10 +323,9 @@ interface NextMatchOptions {
   matcher?: Matcher<Handler>
 }
 
-function useNextMatch(options?: NextMatchOptions): (
-  destination: string | null,
-  notFound: ComponentType
-) => Resolved<Handler>
+function useNextMatch(
+  options?: NextMatchOptions
+): (destination: string | null, notFound: ComponentType) => Resolved<Handler>
 ```
 
 Resolves a URL to a route match. Returns a resolver function. Falls back to `notFound` component when no route matches. Used internally by Router.
@@ -327,9 +341,7 @@ interface PrecommitHandlerOptions {
   url: URL
 }
 
-function useNavigationHandlers(
-  transition?: ReturnType<typeof useTransition>
-): {
+function useNavigationHandlers(transition?: ReturnType<typeof useTransition>): {
   createPrecommitHandler: (options: PrecommitHandlerOptions) => (() => Promise<void>) | undefined
   createHandler: (callback: () => void) => () => Promise<void>
 }
@@ -359,12 +371,12 @@ Subscribes to navigation lifecycle events. All callbacks wrapped in `useEffectEv
 
 ```ts
 interface ActiveLinkOptions {
-  exact?: boolean  // default: true
+  exact?: boolean // default: true
 }
 
 interface ActiveLinkProps {
-  "data-active"?: true
-  "aria-current"?: "page"
+  'data-active'?: true
+  'aria-current'?: 'page'
 }
 
 function useActiveLinkProps(
@@ -379,7 +391,7 @@ Computes active link state by comparing `href` pathname against current pathname
 function NavLink({ href, children }: { href: string; children: ReactNode }) {
   const { isActive, props } = useActiveLinkProps(href)
   return (
-    <a href={href} className={isActive ? "active" : ""} {...props}>
+    <a href={href} className={isActive ? 'active' : ''} {...props}>
       {children}
     </a>
   )

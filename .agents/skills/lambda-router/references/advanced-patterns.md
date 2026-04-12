@@ -22,15 +22,15 @@
 Route components work with `React.lazy()` out of the box. The `<Router>` wraps rendering in a `<Suspense>` boundary.
 
 ```tsx
-import { lazy } from "react"
-import { createRouter, Router } from "@studiolambda/router/react"
+import { lazy } from 'react'
+import { createRouter, Router } from '@studiolambda/router/react'
 
-const Dashboard = lazy(() => import("./pages/Dashboard"))
-const Settings = lazy(() => import("./pages/Settings"))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Settings = lazy(() => import('./pages/Settings'))
 
 const router = createRouter((route) => {
-  route("/dashboard").render(Dashboard)
-  route("/settings").render(Settings)
+  route('/dashboard').render(Dashboard)
+  route('/settings').render(Settings)
 })
 
 function App() {
@@ -60,7 +60,7 @@ The `fallback` prop is passed to the internal `<Suspense>` boundary.
 ### Via `usePrefetch` (manual)
 
 ```tsx
-import { usePrefetch } from "@studiolambda/router/react"
+import { usePrefetch } from '@studiolambda/router/react'
 
 function SearchResults({ results }) {
   const prefetch = usePrefetch()
@@ -69,8 +69,7 @@ function SearchResults({ results }) {
     <a
       key={result.id}
       href={`/item/${result.id}`}
-      onMouseEnter={() => prefetch(`/item/${result.id}`)}
-    >
+      onMouseEnter={() => prefetch(`/item/${result.id}`)}>
       {result.title}
     </a>
   ))
@@ -80,12 +79,12 @@ function SearchResults({ results }) {
 ### Via `usePrefetchEffect` (ref-based)
 
 ```tsx
-import { useRef } from "react"
-import { usePrefetchEffect } from "@studiolambda/router/react"
+import { useRef } from 'react'
+import { usePrefetchEffect } from '@studiolambda/router/react'
 
 function ProductCard({ href }: { href: string }) {
   const ref = useRef<HTMLDivElement>(null)
-  usePrefetchEffect(ref, { href, on: "viewport" })
+  usePrefetchEffect(ref, { href, on: 'viewport' })
 
   return <div ref={ref}>...</div>
 }
@@ -95,11 +94,11 @@ function ProductCard({ href }: { href: string }) {
 
 ```tsx
 const router = createRouter((route) => {
-  route("/user/:id")
+  route('/user/:id')
     .prefetch(async ({ params, url }) => {
       // Preload the user data before the route renders
       await queryClient.prefetchQuery({
-        queryKey: ["user", params.id],
+        queryKey: ['user', params.id],
         queryFn: () => fetchUser(params.id),
       })
     })
@@ -114,8 +113,8 @@ const router = createRouter((route) => {
 To read `isPending` **above** the Router (e.g. for a top-level progress bar), pass a `transition` prop:
 
 ```tsx
-import { useTransition } from "react"
-import { Router } from "@studiolambda/router/react"
+import { useTransition } from 'react'
+import { Router } from '@studiolambda/router/react'
 
 function App() {
   const transition = useTransition()
@@ -140,10 +139,10 @@ Routes can handle form submissions via the Navigation API's form interception:
 
 ```tsx
 const router = createRouter((route) => {
-  route("/contact")
+  route('/contact')
     .formHandler(async (formData, event) => {
-      const name = formData.get("name")
-      const email = formData.get("email")
+      const name = formData.get('name')
+      const email = formData.get('email')
       await submitContactForm({ name, email })
     })
     .render(ContactPage)
@@ -171,13 +170,13 @@ When a form submits to a route with a `formHandler`, the handler is called inste
 ```tsx
 const router = createRouter((route) => {
   // Carry params to the new location
-  route("/old-user/:id").redirect(({ params }) => `/user/${params.id}`)
+  route('/old-user/:id').redirect(({ params }) => `/user/${params.id}`)
 
   // Preserve query string
-  route("/search-old").redirect(({ url }) => `/search${url.search}`)
+  route('/search-old').redirect(({ url }) => `/search${url.search}`)
 
   // Conditional redirect (based on param)
-  route("/v1/:resource").redirect(({ params }) => `/v2/${params.resource}`)
+  route('/v1/:resource').redirect(({ params }) => `/v2/${params.resource}`)
 })
 ```
 
@@ -212,12 +211,12 @@ function SidebarLayout({ children }: PropsWithChildren) {
 const router = createRouter((route) => {
   const app = route().middleware([AppLayout]).group()
 
-  app("/").render(Home)
-  app("/about").render(About)
+  app('/').render(Home)
+  app('/about').render(About)
 
   const withSidebar = app().middleware([SidebarLayout]).group()
-  withSidebar("/dashboard").render(Dashboard)
-  withSidebar("/settings").render(Settings)
+  withSidebar('/dashboard').render(Dashboard)
+  withSidebar('/settings').render(Settings)
 })
 ```
 
@@ -230,7 +229,7 @@ Nesting: `AppLayout` > `SidebarLayout` > route component.
 Middleware can use React 19's `use()` to suspend while checking auth:
 
 ```tsx
-import { type PropsWithChildren, use } from "react"
+import { type PropsWithChildren, use } from 'react'
 
 // Cache the auth promise so it's not re-created on each render
 let authPromise: Promise<Session | null> | undefined
@@ -248,7 +247,7 @@ function RequireAuth({ children }: PropsWithChildren) {
 
 const router = createRouter((route) => {
   const authed = route().middleware([RequireAuth]).group()
-  authed("/dashboard").render(Dashboard)
+  authed('/dashboard').render(Dashboard)
 })
 ```
 
@@ -261,7 +260,7 @@ The nearest `<Suspense>` boundary (the Router's `fallback`) shows while the auth
 Use `useNavigationSignal()` to abort in-flight requests when the user navigates away:
 
 ```tsx
-import { useNavigationSignal } from "@studiolambda/router/react"
+import { useNavigationSignal } from '@studiolambda/router/react'
 
 function DataPage() {
   const signal = useNavigationSignal()
@@ -270,11 +269,11 @@ function DataPage() {
   useEffect(() => {
     if (!signal) return
 
-    fetch("/api/data", { signal })
+    fetch('/api/data', { signal })
       .then((res) => res.json())
       .then(setData)
       .catch((error) => {
-        if (error.name !== "AbortError") throw error
+        if (error.name !== 'AbortError') throw error
       })
   }, [signal])
 
@@ -293,7 +292,7 @@ Pass the `route` factory to remote modules for decentralized route registration:
 ```tsx
 // host app
 const router = createRouter((route) => {
-  route("/").render(Home)
+  route('/').render(Home)
 
   // remote module registers its own routes
   registerDashboardRoutes(route)
@@ -301,9 +300,9 @@ const router = createRouter((route) => {
 
 // remote module
 export function registerDashboardRoutes(route: RouteFactory) {
-  const dashboard = route("/dashboard").middleware([Auth]).group()
-  dashboard("/").render(DashboardHome)
-  dashboard("/analytics").render(Analytics)
+  const dashboard = route('/dashboard').middleware([Auth]).group()
+  dashboard('/').render(DashboardHome)
+  dashboard('/analytics').render(Analytics)
 }
 ```
 
@@ -314,17 +313,18 @@ export function registerDashboardRoutes(route: RouteFactory) {
 After events like logout, clear the prefetch cache to force re-prefetch:
 
 ```tsx
-import { clearPrefetchCache } from "@studiolambda/router/react"
+import { clearPrefetchCache } from '@studiolambda/router/react'
 
 function LogoutButton() {
   const navigate = useNavigate()
 
   return (
-    <button onClick={() => {
-      clearSession()
-      clearPrefetchCache(router)  // pass the matcher instance
-      navigate("/login")
-    }}>
+    <button
+      onClick={() => {
+        clearSession()
+        clearPrefetchCache(router) // pass the matcher instance
+        navigate('/login')
+      }}>
       Logout
     </button>
   )
@@ -338,17 +338,13 @@ function LogoutButton() {
 Build a custom navigation link using `useActiveLinkProps`:
 
 ```tsx
-import { useActiveLinkProps } from "@studiolambda/router/react"
+import { useActiveLinkProps } from '@studiolambda/router/react'
 
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const { isActive, props } = useActiveLinkProps(href, { exact: false })
 
   return (
-    <a
-      href={href}
-      className={`nav-link ${isActive ? "nav-link--active" : ""}`}
-      {...props}
-    >
+    <a href={href} className={`nav-link ${isActive ? 'nav-link--active' : ''}`} {...props}>
       {children}
     </a>
   )
@@ -366,17 +362,13 @@ Control per-route scroll restoration and focus reset:
 ```tsx
 const router = createRouter((route) => {
   // Default: browser handles scroll after transition
-  route("/page").render(Page)
+  route('/page').render(Page)
 
   // Manual scroll: your component calls window.scrollTo() or similar
-  route("/infinite-list")
-    .scroll("manual")
-    .render(InfiniteList)
+  route('/infinite-list').scroll('manual').render(InfiniteList)
 
   // Manual focus: your component manages focus
-  route("/form")
-    .focusReset("manual")
-    .render(FormPage)
+  route('/form').focusReset('manual').render(FormPage)
 })
 ```
 

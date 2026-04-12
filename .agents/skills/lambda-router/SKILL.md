@@ -9,7 +9,7 @@ description: >
   middleware, prefetch, lazy loading, SSR with createMemoryNavigation, search
   params, and form handling.
 metadata:
-  version: "2.0.0"
+  version: '2.0.0'
 ---
 
 # Lambda Router
@@ -28,15 +28,15 @@ Links don't need `onClick` or `preventDefault` — the Navigation API intercepts
 ## Quick Start
 
 ```tsx
-import { lazy, Suspense } from "react"
-import { createRouter, Router, Link } from "@studiolambda/router/react"
+import { lazy, Suspense } from 'react'
+import { createRouter, Router, Link } from '@studiolambda/router/react'
 
-const Home = lazy(() => import("./pages/Home"))
-const User = lazy(() => import("./pages/User"))
+const Home = lazy(() => import('./pages/Home'))
+const User = lazy(() => import('./pages/User'))
 
 const router = createRouter((route) => {
-  route("/").render(Home)
-  route("/user/:id").render(User)
+  route('/').render(Home)
+  route('/user/:id').render(User)
 })
 
 function App() {
@@ -59,40 +59,41 @@ Build a `Matcher<Handler>` with the declarative builder API. See [route-builder.
 ```tsx
 const router = createRouter((route) => {
   // Static route
-  route("/").render(Home)
+  route('/').render(Home)
 
   // Dynamic params
-  route("/user/:id").render(User)
+  route('/user/:id').render(User)
 
   // Wildcard (catches remaining segments)
-  route("/files/*path").render(FileViewer)
+  route('/files/*path').render(FileViewer)
 
   // Redirect (static)
-  route("/old").redirect("/new")
+  route('/old').redirect('/new')
 
   // Redirect (dynamic with params)
-  route("/old-user/:id").redirect(({ params }) => `/user/${params.id}`)
+  route('/old-user/:id').redirect(({ params }) => `/user/${params.id}`)
 
   // Route with prefetch, scroll, and form handling
-  route("/search")
-    .prefetch(({ url }) => prefetchSearchResults(url.searchParams.get("q")))
-    .scroll("manual")
+  route('/search')
+    .prefetch(({ url }) => prefetchSearchResults(url.searchParams.get('q')))
+    .scroll('manual')
     .formHandler((formData) => handleSearchForm(formData))
     .render(SearchPage)
 
   // Middleware group — all children inherit Auth
   const authed = route().middleware([Auth]).group()
-  authed("/dashboard").render(Dashboard)
-  authed("/settings").render(Settings)
+  authed('/dashboard').render(Dashboard)
+  authed('/settings').render(Settings)
 
   // Nested groups accumulate prefix + middleware
-  const admin = authed("/admin").middleware([AdminGuard]).group()
-  admin("/users").render(AdminUsers)    // path: /admin/users
-  admin("/config").render(AdminConfig)  // path: /admin/config
+  const admin = authed('/admin').middleware([AdminGuard]).group()
+  admin('/users').render(AdminUsers) // path: /admin/users
+  admin('/config').render(AdminConfig) // path: /admin/config
 })
 ```
 
 **Rules:**
+
 - `.render()`, `.redirect()`, `.group()` are terminal — no further chaining after
 - Groups inherit middleware and prefetch from parents; redirects do NOT inherit middleware
 - Duplicate route registration throws
@@ -106,10 +107,10 @@ Top-level orchestrator. Provides contexts consumed by all hooks.
 
 ```tsx
 <Router
-  matcher={router}                          // Matcher<Handler> (required in practice)
-  navigation={memoryNav}                    // Navigation override (SSR/testing)
-  notFound={Custom404}                      // custom 404 component
-  fallback={<Spinner />}                    // Suspense fallback
+  matcher={router} // Matcher<Handler> (required in practice)
+  navigation={memoryNav} // Navigation override (SSR/testing)
+  notFound={Custom404} // custom 404 component
+  fallback={<Spinner />} // Suspense fallback
   transition={[isPending, startTransition]} // share transition with parent
   onNavigateSuccess={() => analytics.pageView()}
   onNavigateError={(error) => reportError(error)}
@@ -147,21 +148,21 @@ Active links get `data-active` and `aria-current="page"` attributes automaticall
 
 All hooks must be used inside a `<Router>` tree. They throw descriptive errors outside their provider. See [hooks-reference.md](references/hooks-reference.md) for complete API.
 
-| Hook | Returns | Purpose |
-|------|---------|---------|
-| `useParams()` | `Record<string, string>` | Dynamic route params (`:id` segments) |
-| `usePathname()` | `string` | Current URL pathname |
-| `useSearchParams()` | `[URLSearchParams, setter]` | Search params + setter (preserves hash) |
-| `useNavigate()` | `(url, options?) => NavigationResult` | Programmatic navigation |
-| `useNavigation()` | `Navigation` | Raw Navigation API object |
-| `useNavigationType()` | `NavigationType \| null` | `push`/`replace`/`reload`/`traverse` |
-| `useNavigationSignal()` | `AbortSignal \| null` | Current navigation's abort signal |
-| `useIsPending()` | `boolean` | Whether a transition is in progress |
-| `useBack()` | `{ back, canGoBack }` | Back navigation + reactive availability |
-| `useForward()` | `{ forward, canGoForward }` | Forward navigation + reactive availability |
-| `usePrefetch()` | `(url) => void` | Trigger route prefetch manually |
-| `usePrefetchEffect(ref, opts)` | `void` | Attach prefetch to DOM element |
-| `useActiveLinkProps(href, opts)` | `{ isActive, props }` | Active link detection |
+| Hook                             | Returns                               | Purpose                                    |
+| -------------------------------- | ------------------------------------- | ------------------------------------------ |
+| `useParams()`                    | `Record<string, string>`              | Dynamic route params (`:id` segments)      |
+| `usePathname()`                  | `string`                              | Current URL pathname                       |
+| `useSearchParams()`              | `[URLSearchParams, setter]`           | Search params + setter (preserves hash)    |
+| `useNavigate()`                  | `(url, options?) => NavigationResult` | Programmatic navigation                    |
+| `useNavigation()`                | `Navigation`                          | Raw Navigation API object                  |
+| `useNavigationType()`            | `NavigationType \| null`              | `push`/`replace`/`reload`/`traverse`       |
+| `useNavigationSignal()`          | `AbortSignal \| null`                 | Current navigation's abort signal          |
+| `useIsPending()`                 | `boolean`                             | Whether a transition is in progress        |
+| `useBack()`                      | `{ back, canGoBack }`                 | Back navigation + reactive availability    |
+| `useForward()`                   | `{ forward, canGoForward }`           | Forward navigation + reactive availability |
+| `usePrefetch()`                  | `(url) => void`                       | Trigger route prefetch manually            |
+| `usePrefetchEffect(ref, opts)`   | `void`                                | Attach prefetch to DOM element             |
+| `useActiveLinkProps(href, opts)` | `{ isActive, props }`                 | Active link detection                      |
 
 ### Common Hook Patterns
 
@@ -176,7 +177,10 @@ function UserPage() {
 function LogoutButton() {
   const navigate = useNavigate()
   return (
-    <button onClick={() => { navigate("/login") }}>
+    <button
+      onClick={() => {
+        navigate('/login')
+      }}>
       Logout
     </button>
   )
@@ -185,13 +189,8 @@ function LogoutButton() {
 // Search params
 function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const query = searchParams.get("q") ?? ""
-  return (
-    <input
-      value={query}
-      onChange={(e) => setSearchParams({ q: e.target.value })}
-    />
-  )
+  const query = searchParams.get('q') ?? ''
+  return <input value={query} onChange={(e) => setSearchParams({ q: e.target.value })} />
 }
 
 // Pending indicator
@@ -211,7 +210,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 Middleware components receive `{ children }` and wrap the route component. They can suspend, conditionally render, or add context.
 
 ```tsx
-import { type PropsWithChildren, use } from "react"
+import { type PropsWithChildren, use } from 'react'
 
 // Auth guard using Suspense
 function Auth({ children }: PropsWithChildren) {
@@ -233,7 +232,7 @@ function DashboardLayout({ children }: PropsWithChildren) {
 // Apply to routes
 const router = createRouter((route) => {
   const authed = route().middleware([Auth, DashboardLayout]).group()
-  authed("/dashboard").render(Dashboard)
+  authed('/dashboard').render(Dashboard)
 })
 ```
 
@@ -244,18 +243,22 @@ Middlewares nest outermost-first: `[Auth, Layout]` means Auth wraps Layout wraps
 Use `createMemoryNavigation` for non-browser environments:
 
 ```tsx
-import { createMemoryNavigation, Router } from "@studiolambda/router/react"
+import { createMemoryNavigation, Router } from '@studiolambda/router/react'
 
 // SSR
-const navigation = createMemoryNavigation({ url: "https://example.com/page" })
+const navigation = createMemoryNavigation({ url: 'https://example.com/page' })
 function ServerApp() {
   return <Router matcher={router} navigation={navigation} />
 }
 
 // Testing helper
-function renderWithRouter(ui: React.ReactNode, { url = "/" } = {}) {
+function renderWithRouter(ui: React.ReactNode, { url = '/' } = {}) {
   const nav = createMemoryNavigation({ url: `http://localhost${url}` })
-  return render(<Router matcher={router} navigation={nav}>{ui}</Router>)
+  return render(
+    <Router matcher={router} navigation={nav}>
+      {ui}
+    </Router>
+  )
 }
 ```
 
@@ -266,17 +269,17 @@ function renderWithRouter(ui: React.ReactNode, { url = "/" } = {}) {
 The core matcher can be used independently of React:
 
 ```ts
-import { createMatcher } from "@studiolambda/router"
+import { createMatcher } from '@studiolambda/router'
 
 const matcher = createMatcher<string>()
-matcher.register("/users", "list")
-matcher.register("/users/:id", "detail")
-matcher.register("/files/*path", "files")
+matcher.register('/users', 'list')
+matcher.register('/users/:id', 'detail')
+matcher.register('/files/*path', 'files')
 
-matcher.match("/users")         // { handler: "list", params: {} }
-matcher.match("/users/42")      // { handler: "detail", params: { id: "42" } }
-matcher.match("/files/a/b/c")   // { handler: "files", params: { path: "a/b/c" } }
-matcher.match("/unknown")       // null
+matcher.match('/users') // { handler: "list", params: {} }
+matcher.match('/users/42') // { handler: "detail", params: { id: "42" } }
+matcher.match('/files/a/b/c') // { handler: "files", params: { path: "a/b/c" } }
+matcher.match('/unknown') // null
 ```
 
 - Matching priority: static > dynamic (`:param`) > wildcard (`*param`)
