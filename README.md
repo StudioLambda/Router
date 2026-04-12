@@ -6,7 +6,7 @@ Lambda Router is a client-side routing library designed for single-page applicat
 
 ## Documentation
 
-Find out about the project and discover the features at the [Documentation](https://lambda.studio/router/getting-started/)
+Find out about the project and discover the features at the [Documentation](https://docs.lambda-studio.com/router/getting-started/)
 
 ## Installation
 
