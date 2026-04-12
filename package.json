@@ -18,7 +18,7 @@
     "email": "soc@erik.cat",
     "url": "https://erik.cat"
   },
-  "homepage": "https://erik.cat/blog/router-docs",
+  "homepage": "https://docs.lambda-studio.com/router/getting-started/",
   "repository": {
     "type": "git",
     "url": "https://github.com/StudioLambda/Router.git"
