@@ -65,4 +65,36 @@ describe('createMemoryNavigation', { concurrent: true }, function () {
 
     expect(finished?.url).toBe('https://example.com/')
   })
+
+  it('back returns a result with pre-resolved promises', async function ({ expect }) {
+    const nav = createMemoryNavigation({ url: 'https://example.com/' })
+    const result = nav.back()
+    const committed = await result.committed
+
+    expect(committed?.url).toBe('https://example.com/')
+  })
+
+  it('forward returns a result with pre-resolved promises', async function ({ expect }) {
+    const nav = createMemoryNavigation({ url: 'https://example.com/' })
+    const result = nav.forward()
+    const finished = await result.finished
+
+    expect(finished?.url).toBe('https://example.com/')
+  })
+
+  it('traverseTo returns a result with pre-resolved promises', async function ({ expect }) {
+    const nav = createMemoryNavigation({ url: 'https://example.com/' })
+    const result = nav.traverseTo('some-key')
+    const committed = await result.committed
+
+    expect(committed?.url).toBe('https://example.com/')
+  })
+
+  it('updateCurrentEntry does not throw', function ({ expect }) {
+    const nav = createMemoryNavigation({ url: 'https://example.com/' })
+
+    expect(function () {
+      nav.updateCurrentEntry({ state: { foo: 'bar' } })
+    }).not.toThrow()
+  })
 })

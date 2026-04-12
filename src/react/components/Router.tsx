@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { type Handler } from 'router/react:router'
 import { type Matcher } from 'router:matcher'
-import { ParamsContext } from 'router/react:context/PropsContext'
+import { ParamsContext } from 'router/react:context/ParamsContext'
 import { NavigationContext } from 'router/react:context/NavigationContext'
 import { NavigationSignalContext } from 'router/react:context/NavigationSignalContext'
 import { NavigationTypeContext } from 'router/react:context/NavigationTypeContext'
@@ -152,10 +152,10 @@ export interface RouterProps {
  * - `PathnameContext` — the current URL pathname
  * - `ParamsContext` — the extracted route parameters
  */
-export function Router(options: RouterProps) {
+export function Router(props: RouterProps) {
   const contextNavigation = use(NavigationContext)
   const navigation: Navigation =
-    options.navigation ??
+    props.navigation ??
     contextNavigation ??
     (typeof window !== 'undefined' ? window.navigation : undefined)!
 
@@ -166,11 +166,11 @@ export function Router(options: RouterProps) {
         'Use createMemoryNavigation() for SSR or non-browser environments.'
     )
   }
-  const matcher: Matcher<Handler> = options.matcher ?? use(MatcherContext)
+  const matcher: Matcher<Handler> = props.matcher ?? use(MatcherContext)
   const internalTransition = useTransition()
-  const transition = options.transition ?? internalTransition
+  const transition = props.transition ?? internalTransition
   const next = useNextMatch({ matcher })
-  const notFound = options.notFound ?? NotFound
+  const notFound = props.notFound ?? NotFound
 
   const [current, setCurrent] = useState<CurrentState>(function () {
     const url = navigation.currentEntry?.url ?? null
@@ -247,8 +247,8 @@ export function Router(options: RouterProps) {
 
   useNavigationEvents(navigation, {
     onNavigate,
-    onNavigateSuccess: options.onNavigateSuccess,
-    onNavigateError: options.onNavigateError,
+    onNavigateSuccess: props.onNavigateSuccess,
+    onNavigateError: props.onNavigateError,
   })
 
   const CurrentComponent = current.match.handler.component
@@ -263,7 +263,7 @@ export function Router(options: RouterProps) {
               <PathnameContext value={current.pathname}>
                 <UrlContext value={current.url}>
                   <ParamsContext value={current.match.params}>
-                    <Suspense fallback={options.fallback}>
+                    <Suspense fallback={props.fallback}>
                       <Middlewares value={middlewares}>
                         <CurrentComponent />
                       </Middlewares>

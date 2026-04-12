@@ -79,6 +79,17 @@ export function useActiveLinkProps(
   options?: ActiveLinkOptions
 ): { isActive: boolean; props: ActiveLinkProps } {
   const currentPathname = use(PathnameContext)
+
+  if (currentPathname === null) {
+    return {
+      isActive: false,
+      props: {
+        'data-active': undefined,
+        'aria-current': undefined,
+      },
+    }
+  }
+
   const isExact = options?.exact ?? true
 
   const isActive = isActiveHref(href, currentPathname, isExact)

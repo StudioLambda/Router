@@ -6,7 +6,7 @@ import { Router } from './Router'
 import { createMatcher } from 'router:matcher'
 import { type Handler } from 'router/react:router'
 import { PathnameContext } from 'router/react:context/PathnameContext'
-import { ParamsContext } from 'router/react:context/PropsContext'
+import { ParamsContext } from 'router/react:context/ParamsContext'
 import { NavigationContext } from 'router/react:context/NavigationContext'
 import { TransitionContext } from 'router/react:context/TransitionContext'
 

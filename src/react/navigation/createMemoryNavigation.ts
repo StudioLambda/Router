@@ -1,10 +1,10 @@
 /**
  * Minimal subset of the NavigationHistoryEntry interface
- * needed by the Router component. Only the `url` property
- * is read during rendering. The full NavigationHistoryEntry
- * interface is far larger, but the Router never accesses
- * properties like `key`, `id`, `sameDocument`, `getState`,
- * or the event handlers.
+ * needed by the Router component and associated hooks. Only
+ * the `url` property is read during rendering. The full
+ * NavigationHistoryEntry interface is far larger, but the
+ * Router never accesses properties like `key`, `id`,
+ * `sameDocument`, `getState`, or the event handlers.
  */
 interface MemoryNavigationEntry {
   /**
@@ -33,13 +33,17 @@ export interface MemoryNavigationOptions {
  * browser Navigation API is unavailable.
  *
  * The returned object satisfies the subset of the `Navigation`
- * interface consumed by the Router component:
+ * interface consumed by the Router component and hooks:
  *
  * - `currentEntry.url` — returns the initial URL
  * - `addEventListener` / `removeEventListener` — no-ops
  *   (no events fire in a memory environment)
  * - `navigate()` — no-op that returns a NavigationResult
  *   with immediately-resolved promises
+ * - `back()` / `forward()` — no-ops that return a
+ *   NavigationResult with immediately-resolved promises
+ * - `traverseTo()` — no-op that returns a NavigationResult
+ * - `updateCurrentEntry()` — no-op
  * - `canGoBack` / `canGoForward` — always false
  * - `entries()` — returns a single-entry array
  *
@@ -70,6 +74,19 @@ export function createMemoryNavigation(options: MemoryNavigationOptions): Naviga
     url: options.url,
   }
 
+  const entryAsHistoryEntry = entry as unknown as NavigationHistoryEntry
+
+  /**
+   * Pre-built NavigationResult returned by all navigation
+   * methods. Uses the same entry cast as a history entry
+   * with immediately-resolved promises. Allocated once to
+   * avoid per-call object creation.
+   */
+  const result: NavigationResult = {
+    committed: Promise.resolve(entryAsHistoryEntry),
+    finished: Promise.resolve(entryAsHistoryEntry),
+  }
+
   /**
    * No-op event listener registration. In SSR and testing
    * environments, no navigation events are dispatched, so
@@ -91,18 +108,48 @@ export function createMemoryNavigation(options: MemoryNavigationOptions): Naviga
    * on the result.
    */
   function navigate(): NavigationResult {
-    return {
-      committed: Promise.resolve(entry as unknown as NavigationHistoryEntry),
-      finished: Promise.resolve(entry as unknown as NavigationHistoryEntry),
-    }
+    return result
   }
+
+  /**
+   * No-op backward navigation. Returns pre-resolved promises
+   * matching the NavigationResult interface. In a memory
+   * environment there is no history stack to traverse.
+   */
+  function back(): NavigationResult {
+    return result
+  }
+
+  /**
+   * No-op forward navigation. Returns pre-resolved promises
+   * matching the NavigationResult interface. In a memory
+   * environment there is no history stack to traverse.
+   */
+  function forward(): NavigationResult {
+    return result
+  }
+
+  /**
+   * No-op history traversal to a specific entry key. Returns
+   * pre-resolved promises. In a memory environment there is
+   * only a single entry, so traversal is meaningless.
+   */
+  function traverseTo(): NavigationResult {
+    return result
+  }
+
+  /**
+   * No-op current entry state update. In a memory environment
+   * entry state is not tracked, so this is silently ignored.
+   */
+  function updateCurrentEntry() {}
 
   /**
    * Returns the single-entry history list. The memory
    * adapter only ever has one entry — the initial URL.
    */
   function entries(): NavigationHistoryEntry[] {
-    return [entry as unknown as NavigationHistoryEntry]
+    return [entryAsHistoryEntry]
   }
 
   return {
@@ -113,6 +160,10 @@ export function createMemoryNavigation(options: MemoryNavigationOptions): Naviga
     addEventListener,
     removeEventListener,
     navigate,
+    back,
+    forward,
+    traverseTo,
+    updateCurrentEntry,
     entries,
   } as unknown as Navigation
 }

@@ -1,4 +1,4 @@
-import { type TransitionFunction, createContext, useTransition } from 'react'
+import { createContext, useTransition } from 'react'
 
 /**
  * Provides the `[isPending, startTransition]` tuple from
@@ -13,9 +13,3 @@ import { type TransitionFunction, createContext, useTransition } from 'react'
  * explicit provider instead.
  */
 export const TransitionContext = createContext<ReturnType<typeof useTransition> | null>(null)
-
-/**
- * Type alias for the startTransition function extracted from
- * the useTransition tuple.
- */
-export type StartTransitionFn = (callback: TransitionFunction) => void

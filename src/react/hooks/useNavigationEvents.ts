@@ -44,6 +44,24 @@ export interface NavigationEventHandlers {
  * @param navigation - The Navigation object to subscribe to.
  * @param handlers - Callbacks for each navigation lifecycle
  *   event. All are optional.
+ *
+ * @example
+ * ```tsx
+ * function NavigationLogger() {
+ *   const navigation = useNavigation()
+ *
+ *   useNavigationEvents(navigation, {
+ *     onNavigateSuccess() {
+ *       console.log('navigation completed')
+ *     },
+ *     onNavigateError(error) {
+ *       console.error('navigation failed', error)
+ *     },
+ *   })
+ *
+ *   return null
+ * }
+ * ```
  */
 export function useNavigationEvents(navigation: Navigation, handlers: NavigationEventHandlers) {
   /**

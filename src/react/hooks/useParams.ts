@@ -1,5 +1,5 @@
 import { use } from 'react'
-import { ParamsContext } from 'router/react:context/PropsContext'
+import { ParamsContext } from 'router/react:context/ParamsContext'
 
 /**
  * Returns the dynamic route parameters extracted from the
@@ -11,6 +11,7 @@ import { ParamsContext } from 'router/react:context/PropsContext'
  * `ParamsContext` is provided.
  *
  * @returns A record of parameter names to their string values.
+ * @throws When used outside a Router or ParamsContext provider.
  *
  * @example
  * ```tsx
@@ -19,6 +20,12 @@ import { ParamsContext } from 'router/react:context/PropsContext'
  * const { id } = useParams() // id === "42"
  * ```
  */
-export function useParams() {
-  return use(ParamsContext)
+export function useParams(): Record<string, string> {
+  const params = use(ParamsContext)
+
+  if (params === null) {
+    throw new Error('useParams requires a <Router> or <ParamsContext> provider')
+  }
+
+  return params
 }

@@ -12,6 +12,16 @@ import { NavigationContext } from 'router/react:context/NavigationContext'
  *
  * @returns The Navigation object from the nearest provider.
  * @throws When used outside a NavigationContext provider.
+ *
+ * @example
+ * ```tsx
+ * function HistoryDebug() {
+ *   const navigation = useNavigation()
+ *   const entries = navigation.entries()
+ *
+ *   return <pre>{JSON.stringify(entries.map(e => e.url))}</pre>
+ * }
+ * ```
  */
 export function useNavigation(): Navigation {
   const navigation = use(NavigationContext)

@@ -11,8 +11,29 @@ import { NavigationSignalContext } from 'router/react:context/NavigationSignalCo
  * Returns `null` before any navigation event has occurred
  * (i.e. on the initial render).
  *
+ * Must be used inside a `<Router>` component tree.
+ *
  * @returns The current AbortSignal or null.
+ * @throws When used outside a Router or NavigationSignalContext
+ *   provider.
+ *
+ * @example
+ * ```tsx
+ * function UserProfile({ id }: { id: string }) {
+ *   const signal = useNavigationSignal()
+ *
+ *   useEffect(function () {
+ *     fetch(`/api/user/${id}`, { signal })
+ *   }, [id, signal])
+ * }
+ * ```
  */
 export function useNavigationSignal(): AbortSignal | null {
-  return use(NavigationSignalContext)
+  const signal = use(NavigationSignalContext)
+
+  if (signal === undefined) {
+    throw new Error('useNavigationSignal requires a <Router> or <NavigationSignalContext> provider')
+  }
+
+  return signal
 }

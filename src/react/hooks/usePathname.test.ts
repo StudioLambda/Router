@@ -5,14 +5,12 @@ import { usePathname } from './usePathname'
 import { PathnameContext } from 'router/react:context/PathnameContext'
 
 describe('usePathname', { concurrent: true }, function () {
-  it('returns "/" by default', function ({ expect, onTestFinished }) {
-    const { current, unmount } = renderHook(function () {
-      return usePathname()
-    })
-
-    onTestFinished(unmount)
-
-    expect(current).toBe('/')
+  it('throws when used outside a provider', function ({ expect }) {
+    expect(function () {
+      renderHook(function () {
+        return usePathname()
+      })
+    }).toThrow('usePathname requires a <Router> or <PathnameContext> provider')
   })
 
   it('returns pathname from context', function ({ expect, onTestFinished }) {

@@ -5,7 +5,7 @@ export * from 'router/react:components/Link'
 
 export * from 'router/react:context/MatcherContext'
 export * from 'router/react:context/TransitionContext'
-export * from 'router/react:context/PropsContext'
+export * from 'router/react:context/ParamsContext'
 export * from 'router/react:context/NavigationContext'
 export * from 'router/react:context/NavigationSignalContext'
 export * from 'router/react:context/NavigationTypeContext'
