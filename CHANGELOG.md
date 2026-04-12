@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0] - 2026-04-12
+
+### 🐛 Bug Fixes
+
+- [**breaking**] Resolve low-severity audit findings across hooks, contexts, and DX
 ## [1.0.0] - 2026-04-12
 
 ### 🐛 Bug Fixes
@@ -9,6 +14,10 @@
 ### 🎨 Styling
 
 - Fix oxfmt formatting in useSearchParams test
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.0.0
 ## [0.1.1] - 2026-04-12
 
 ### 🐛 Bug Fixes
