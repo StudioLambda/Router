@@ -193,6 +193,10 @@ export function createMatcher<T>(options?: Options<T>): Matcher<T> {
       node = next
     }
 
+    if (node.handler !== undefined) {
+      throw new Error(`duplicate route registration for pattern "${pattern}"`)
+    }
+
     node.handler = handler
   }
 

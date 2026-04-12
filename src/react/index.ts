@@ -10,6 +10,7 @@ export * from 'router/react:context/NavigationContext'
 export * from 'router/react:context/NavigationSignalContext'
 export * from 'router/react:context/NavigationTypeContext'
 export * from 'router/react:context/PathnameContext'
+export * from 'router/react:context/UrlContext'
 
 export * from 'router/react:hooks/useNavigation'
 export * from 'router/react:hooks/useNavigate'

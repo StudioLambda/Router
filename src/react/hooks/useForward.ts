@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useNavigation } from 'router/react:hooks/useNavigation'
 
 /**
@@ -20,7 +21,9 @@ export interface UseForwardResult {
   /**
    * Whether forward navigation is possible. Mirrors
    * `navigation.canGoForward` from the Navigation API.
-   * When false, calling `forward()` will throw.
+   * Reactively updates when navigations change the
+   * history stack. When false, calling `forward()` will
+   * throw.
    */
   readonly canGoForward: boolean
 }
@@ -30,6 +33,11 @@ export interface UseForwardResult {
  * Navigation API. Returns a `forward` function and a
  * `canGoForward` boolean that reflects whether the history
  * stack has a next entry to traverse to.
+ *
+ * The `canGoForward` value is kept in React state and
+ * updated via the `currententrychange` event, ensuring
+ * it stays reactive across navigations — including those
+ * triggered outside of React (e.g. browser forward button).
  *
  * Must be used inside a `<Router>` component tree.
  *
@@ -50,6 +58,27 @@ export interface UseForwardResult {
  */
 export function useForward(): UseForwardResult {
   const navigation = useNavigation()
+  const [canGoForward, setCanGoForward] = useState(navigation.canGoForward)
+
+  useEffect(
+    function () {
+      /**
+       * Syncs the React state with the Navigation API's
+       * `canGoForward` property whenever the current entry
+       * changes.
+       */
+      function onEntryChange() {
+        setCanGoForward(navigation.canGoForward)
+      }
+
+      navigation.addEventListener('currententrychange', onEntryChange)
+
+      return function () {
+        navigation.removeEventListener('currententrychange', onEntryChange)
+      }
+    },
+    [navigation]
+  )
 
   /**
    * Traverses forward in the session history by
@@ -61,6 +90,6 @@ export function useForward(): UseForwardResult {
 
   return {
     forward,
-    canGoForward: navigation.canGoForward,
+    canGoForward,
   }
 }

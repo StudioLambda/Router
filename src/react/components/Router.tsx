@@ -22,6 +22,7 @@ import { useNavigationEvents } from 'router/react:hooks/useNavigationEvents'
 import { MatcherContext } from 'router/react:context/MatcherContext'
 import { TransitionContext } from 'router/react:context/TransitionContext'
 import { PathnameContext } from 'router/react:context/PathnameContext'
+import { UrlContext } from 'router/react:context/UrlContext'
 import { extractPathname } from 'router/react:extractPathname'
 
 /**
@@ -57,6 +58,14 @@ interface CurrentState {
    * active links and read the current location.
    */
   pathname: string
+
+  /**
+   * The full destination URL string for this navigation.
+   * Used by `useSearchParams` to derive search parameters
+   * from React state rather than reading the mutable
+   * `navigation.currentEntry` during render.
+   */
+  url: string | null
 }
 
 /**
@@ -171,6 +180,7 @@ export function Router(options: RouterProps) {
       signal: null,
       navigationType: null,
       pathname: extractPathname(url),
+      url,
     }
   })
 
@@ -223,6 +233,7 @@ export function Router(options: RouterProps) {
         signal: event.signal,
         navigationType: event.navigationType,
         pathname: extractPathname(event.destination.url),
+        url: event.destination.url,
       })
     })
 
@@ -250,13 +261,15 @@ export function Router(options: RouterProps) {
           <NavigationTypeContext value={current.navigationType}>
             <NavigationSignalContext value={current.signal}>
               <PathnameContext value={current.pathname}>
-                <ParamsContext value={current.match.params}>
-                  <Suspense fallback={options.fallback}>
-                    <Middlewares value={middlewares}>
-                      <CurrentComponent />
-                    </Middlewares>
-                  </Suspense>
-                </ParamsContext>
+                <UrlContext value={current.url}>
+                  <ParamsContext value={current.match.params}>
+                    <Suspense fallback={options.fallback}>
+                      <Middlewares value={middlewares}>
+                        <CurrentComponent />
+                      </Middlewares>
+                    </Suspense>
+                  </ParamsContext>
+                </UrlContext>
               </PathnameContext>
             </NavigationSignalContext>
           </NavigationTypeContext>

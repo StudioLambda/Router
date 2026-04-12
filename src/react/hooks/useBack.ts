@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useNavigation } from 'router/react:hooks/useNavigation'
 
 /**
@@ -20,7 +21,8 @@ export interface UseBackResult {
   /**
    * Whether backward navigation is possible. Mirrors
    * `navigation.canGoBack` from the Navigation API.
-   * When false, calling `back()` will throw.
+   * Reactively updates when navigations change the
+   * history stack. When false, calling `back()` will throw.
    */
   readonly canGoBack: boolean
 }
@@ -30,6 +32,11 @@ export interface UseBackResult {
  * Navigation API. Returns a `back` function and a
  * `canGoBack` boolean that reflects whether the history
  * stack has a previous entry to traverse to.
+ *
+ * The `canGoBack` value is kept in React state and
+ * updated via the `currententrychange` event, ensuring
+ * it stays reactive across navigations — including those
+ * triggered outside of React (e.g. browser back button).
  *
  * Must be used inside a `<Router>` component tree.
  *
@@ -50,6 +57,27 @@ export interface UseBackResult {
  */
 export function useBack(): UseBackResult {
   const navigation = useNavigation()
+  const [canGoBack, setCanGoBack] = useState(navigation.canGoBack)
+
+  useEffect(
+    function () {
+      /**
+       * Syncs the React state with the Navigation API's
+       * `canGoBack` property whenever the current entry
+       * changes.
+       */
+      function onEntryChange() {
+        setCanGoBack(navigation.canGoBack)
+      }
+
+      navigation.addEventListener('currententrychange', onEntryChange)
+
+      return function () {
+        navigation.removeEventListener('currententrychange', onEntryChange)
+      }
+    },
+    [navigation]
+  )
 
   /**
    * Traverses backward in the session history by
@@ -61,6 +89,6 @@ export function useBack(): UseBackResult {
 
   return {
     back,
-    canGoBack: navigation.canGoBack,
+    canGoBack,
   }
 }

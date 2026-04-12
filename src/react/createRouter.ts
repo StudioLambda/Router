@@ -304,9 +304,17 @@ function RedirectFallback() {
  *
  * @param matcher - The matcher to register routes on.
  * @param inherited - Configuration from parent groups.
+ * @param redirects - Shared map collecting static redirect
+ *   targets for post-registration cycle detection. Keys are
+ *   source paths, values are target paths. Only populated
+ *   for string (non-callback) redirect targets.
  * @returns A `RouteFactory` function.
  */
-function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfig): RouteFactory {
+function createRouteFactory(
+  matcher: Matcher<Handler>,
+  inherited: InheritedConfig,
+  redirects: Map<string, string>
+): RouteFactory {
   return function route(path?: string): RouteBuilder {
     const state: BuilderState = {
       path,
@@ -315,6 +323,31 @@ function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfi
       scroll: undefined,
       focusReset: undefined,
       formHandler: undefined,
+    }
+
+    /**
+     * Whether a terminal method (`.render()`, `.redirect()`,
+     * or `.group()`) has been called on this builder. Once
+     * consumed, further method calls throw to prevent
+     * accidental reuse.
+     */
+    let isConsumed = false
+
+    /**
+     * Guards against calling builder methods after a terminal
+     * method has been invoked. Throws a descriptive error
+     * indicating which method was called on a consumed builder.
+     *
+     * @param method - The method name being called.
+     * @throws When the builder has already been consumed.
+     */
+    function assertNotConsumed(method: string) {
+      if (isConsumed) {
+        throw new Error(
+          `cannot call .${method}() on a route builder that has ` +
+            `already been consumed by .render(), .redirect(), or .group()`
+        )
+      }
     }
 
     /**
@@ -363,36 +396,44 @@ function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfi
 
     const builder: RouteBuilder = {
       middleware(list) {
+        assertNotConsumed('middleware')
         state.middlewares.push(...list)
 
         return builder
       },
 
       prefetch(fn) {
+        assertNotConsumed('prefetch')
         state.prefetches.push(fn)
 
         return builder
       },
 
       scroll(behavior) {
+        assertNotConsumed('scroll')
         state.scroll = behavior
 
         return builder
       },
 
       focusReset(behavior) {
+        assertNotConsumed('focusReset')
         state.focusReset = behavior
 
         return builder
       },
 
       formHandler(fn) {
+        assertNotConsumed('formHandler')
         state.formHandler = fn
 
         return builder
       },
 
       render(component) {
+        assertNotConsumed('render')
+        isConsumed = true
+
         const fullPath = resolveFullPath()
 
         const handler: Handler = {
@@ -408,7 +449,14 @@ function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfi
       },
 
       redirect(target) {
+        assertNotConsumed('redirect')
+        isConsumed = true
+
         const fullPath = resolveFullPath()
+
+        if (typeof target === 'string') {
+          redirects.set(fullPath, target)
+        }
 
         const handler: Handler = {
           component: RedirectFallback,
@@ -423,6 +471,9 @@ function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfi
       },
 
       group() {
+        assertNotConsumed('group')
+        isConsumed = true
+
         const childPrefix = joinPaths(inherited.prefix, state.path ?? '')
 
         const childInherited: InheritedConfig = {
@@ -431,11 +482,40 @@ function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfi
           prefetches: [...inherited.prefetches, ...state.prefetches],
         }
 
-        return createRouteFactory(matcher, childInherited)
+        return createRouteFactory(matcher, childInherited, redirects)
       },
     }
 
     return builder
+  }
+}
+
+/**
+ * Detects cycles in static redirect routes. Walks each
+ * redirect chain and throws if a cycle is found. Only
+ * checks string (non-callback) redirect targets since
+ * callback targets are resolved at runtime.
+ *
+ * @param redirects - Map of source path to target path
+ *   for all static redirects.
+ * @throws When a redirect cycle is detected, with the
+ *   full cycle path in the error message.
+ */
+function detectRedirectCycles(redirects: Map<string, string>) {
+  for (const [source] of redirects) {
+    const visited = new Set<string>()
+    let current = source
+
+    while (redirects.has(current)) {
+      if (visited.has(current)) {
+        const cycle = [...visited, current].join(' -> ')
+
+        throw new Error(`redirect cycle detected: ${cycle}`)
+      }
+
+      visited.add(current)
+      current = redirects.get(current)!
+    }
   }
 }
 
@@ -448,12 +528,17 @@ function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfi
  * chaining, nested groups with path prefixing, redirects,
  * and all handler options (scroll, focusReset, formHandler).
  *
+ * After all routes are registered, static redirect targets
+ * are checked for cycles. Self-redirects and multi-hop loops
+ * throw an error at registration time.
+ *
  * Returns a `Matcher<Handler>` that plugs directly into the
  * `<Router matcher={...}>` component.
  *
  * @param callback - A function that defines routes using the
  *   provided `route` factory.
  * @returns A populated matcher ready for the Router.
+ * @throws When a static redirect cycle is detected.
  *
  * @example
  * ```tsx
@@ -481,6 +566,7 @@ function createRouteFactory(matcher: Matcher<Handler>, inherited: InheritedConfi
  */
 export function createRouter(callback: (route: RouteFactory) => void): Matcher<Handler> {
   const matcher = createMatcher<Handler>()
+  const redirects = new Map<string, string>()
 
   const rootInherited: InheritedConfig = {
     prefix: '',
@@ -488,9 +574,11 @@ export function createRouter(callback: (route: RouteFactory) => void): Matcher<H
     prefetches: [],
   }
 
-  const route = createRouteFactory(matcher, rootInherited)
+  const route = createRouteFactory(matcher, rootInherited, redirects)
 
   callback(route)
+
+  detectRedirectCycles(redirects)
 
   return matcher
 }
