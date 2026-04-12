@@ -394,6 +394,33 @@ describe('createRouter', { concurrent: true }, function () {
       expect(receivedUrl?.search).toBe('?q=test')
       expect(context.controller.redirect).toHaveBeenCalledWith('/new-search?q=test')
     })
+
+    it('does not inherit middleware from parent groups', function ({ expect }) {
+      const Auth = createMiddleware()
+
+      const router = createRouter(function (route) {
+        const authed = route().middleware([Auth]).group()
+
+        authed('/old').redirect('/new')
+      })
+
+      const match = router.match('/old')
+
+      expect(match).not.toBeNull()
+      expect(match?.handler.middlewares).toBeUndefined()
+    })
+
+    it('does not inherit scroll or focusReset configuration', function ({ expect }) {
+      const router = createRouter(function (route) {
+        route('/old').scroll('manual').focusReset('manual').redirect('/new')
+      })
+
+      const match = router.match('/old')
+
+      expect(match).not.toBeNull()
+      expect(match?.handler.scroll).toBeUndefined()
+      expect(match?.handler.focusReset).toBeUndefined()
+    })
   })
 
   describe('groups', { concurrent: true }, function () {

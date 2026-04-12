@@ -156,6 +156,11 @@ export function createMatcher<T>(options?: Options<T>): Matcher<T> {
 
         if (!node.wildcard) {
           node.wildcard = { children: new Map(), name }
+        } else if (node.wildcard.name !== name) {
+          throw new Error(
+            `conflicting wildcard param name at "${pattern}": ` +
+              `existing "*${node.wildcard.name}" vs new "*${name}"`
+          )
         }
 
         node = node.wildcard
@@ -167,6 +172,11 @@ export function createMatcher<T>(options?: Options<T>): Matcher<T> {
 
         if (!node.child) {
           node.child = { children: new Map(), name }
+        } else if (node.child.name !== name) {
+          throw new Error(
+            `conflicting dynamic param name at "${pattern}": ` +
+              `existing ":${node.child.name}" vs new ":${name}"`
+          )
         }
 
         node = node.child
@@ -216,7 +226,7 @@ export function createMatcher<T>(options?: Options<T>): Matcher<T> {
       params: Record<string, string>
     ): Resolved<T> | null {
       if (index === segments.length) {
-        return node.handler ? { handler: node.handler, params } : null
+        return node.handler !== undefined ? { handler: node.handler, params } : null
       }
 
       const segment = segments[index]
@@ -242,7 +252,7 @@ export function createMatcher<T>(options?: Options<T>): Matcher<T> {
         }
       }
 
-      if (node.wildcard && node.wildcard.name && node.wildcard.handler) {
+      if (node.wildcard && node.wildcard.name && node.wildcard.handler !== undefined) {
         const rest = segments.slice(index).join('/')
 
         return {

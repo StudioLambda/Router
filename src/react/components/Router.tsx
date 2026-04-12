@@ -145,7 +145,18 @@ export interface RouterProps {
  */
 export function Router(options: RouterProps) {
   const contextNavigation = use(NavigationContext)
-  const navigation: Navigation = options.navigation ?? contextNavigation ?? window.navigation
+  const navigation: Navigation =
+    options.navigation ??
+    contextNavigation ??
+    (typeof window !== 'undefined' ? window.navigation : undefined)!
+
+  if (navigation === undefined || navigation === null) {
+    throw new Error(
+      'Router requires a navigation prop, NavigationContext provider, ' +
+        'or browser Navigation API support. ' +
+        'Use createMemoryNavigation() for SSR or non-browser environments.'
+    )
+  }
   const matcher: Matcher<Handler> = options.matcher ?? use(MatcherContext)
   const internalTransition = useTransition()
   const transition = options.transition ?? internalTransition

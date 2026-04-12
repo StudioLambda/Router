@@ -46,7 +46,13 @@ export default defineConfig({
     }),
     dts({
       include: ['**/*.ts*'],
-      exclude: ['**/*.test.ts*'],
+      exclude: [
+        '**/*.test.ts*',
+        '**/example.tsx',
+        '**/ExampleMain.tsx',
+        '**/examples/**',
+        '**/test-helpers.ts',
+      ],
       outDir: '../../dist',
       root: './src/react',
     }),
