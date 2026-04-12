@@ -838,4 +838,205 @@ describe('createRouter', { concurrent: true }, function () {
       expect(router.match('/dashboard/settings')?.handler.component).toBe(DashSettings)
     })
   })
+
+  describe('redirect cycle detection', { concurrent: true }, function () {
+    it('throws on a self-redirect', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          route('/loop').redirect('/loop')
+        })
+      }).toThrow('redirect cycle detected')
+    })
+
+    it('throws on a two-hop redirect cycle', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          route('/a').redirect('/b')
+          route('/b').redirect('/a')
+        })
+      }).toThrow('redirect cycle detected')
+    })
+
+    it('throws on a multi-hop redirect cycle', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          route('/a').redirect('/b')
+          route('/b').redirect('/c')
+          route('/c').redirect('/a')
+        })
+      }).toThrow('redirect cycle detected')
+    })
+
+    it('allows non-cyclic redirect chains', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          route('/a').redirect('/b')
+          route('/b').redirect('/c')
+          route('/c').render(Stub)
+        })
+      }).not.toThrow()
+    })
+
+    it('skips cycle detection for callback redirects', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          route('/a').redirect(function () {
+            return '/a'
+          })
+        })
+      }).not.toThrow()
+    })
+  })
+
+  describe('builder consumed guard', { concurrent: true }, function () {
+    it('throws when calling middleware after render', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.render(Stub)
+          builder.middleware([createMiddleware()])
+        })
+      }).toThrow('cannot call .middleware() on a route builder')
+    })
+
+    it('throws when calling prefetch after render', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.render(Stub)
+          builder.prefetch(vi.fn())
+        })
+      }).toThrow('cannot call .prefetch() on a route builder')
+    })
+
+    it('throws when calling scroll after render', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.render(Stub)
+          builder.scroll('manual')
+        })
+      }).toThrow('cannot call .scroll() on a route builder')
+    })
+
+    it('throws when calling focusReset after render', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.render(Stub)
+          builder.focusReset('manual')
+        })
+      }).toThrow('cannot call .focusReset() on a route builder')
+    })
+
+    it('throws when calling formHandler after render', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.render(Stub)
+          builder.formHandler(vi.fn())
+        })
+      }).toThrow('cannot call .formHandler() on a route builder')
+    })
+
+    it('throws when calling render twice', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.render(Stub)
+          builder.render(createStub())
+        })
+      }).toThrow('cannot call .render() on a route builder')
+    })
+
+    it('throws when calling redirect after render', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.render(Stub)
+          builder.redirect('/other')
+        })
+      }).toThrow('cannot call .redirect() on a route builder')
+    })
+
+    it('throws when calling group after render', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.render(Stub)
+          builder.group()
+        })
+      }).toThrow('cannot call .group() on a route builder')
+    })
+
+    it('throws when calling render after redirect', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.redirect('/other')
+          builder.render(Stub)
+        })
+      }).toThrow('cannot call .render() on a route builder')
+    })
+
+    it('throws when calling render after group', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const builder = route('/page')
+
+          builder.group()
+          builder.render(Stub)
+        })
+      }).toThrow('cannot call .render() on a route builder')
+    })
+  })
+
+  describe('duplicate route registration', { concurrent: true }, function () {
+    it('throws when registering the same path twice with render', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          route('/page').render(Stub)
+          route('/page').render(createStub())
+        })
+      }).toThrow('duplicate route registration')
+    })
+
+    it('throws when registering the same path with render and redirect', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          route('/page').render(Stub)
+          route('/page').redirect('/other')
+        })
+      }).toThrow('duplicate route registration')
+    })
+
+    it('throws when registering the same nested path twice', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          const app = route('/app').group()
+
+          app('/page').render(Stub)
+          app('/page').render(createStub())
+        })
+      }).toThrow('duplicate route registration')
+    })
+
+    it('allows registering different paths', function ({ expect }) {
+      expect(function () {
+        createRouter(function (route) {
+          route('/a').render(Stub)
+          route('/b').render(createStub())
+        })
+      }).not.toThrow()
+    })
+  })
 })

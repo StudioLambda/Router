@@ -274,4 +274,56 @@ describe('router', function () {
       }).not.toThrow()
     })
   })
+
+  describe('duplicate registration', function () {
+    it('throws when registering the same static path twice', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/foo/bar', 1)
+
+      expect(function () {
+        router.register('/foo/bar', 2)
+      }).toThrow('duplicate route registration for pattern "/foo/bar"')
+    })
+
+    it('throws when registering the same dynamic path twice', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/user/:id', 1)
+
+      expect(function () {
+        router.register('/user/:id', 2)
+      }).toThrow('duplicate route registration')
+    })
+
+    it('throws when registering the same wildcard path twice', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/files/*path', 1)
+
+      expect(function () {
+        router.register('/files/*path', 2)
+      }).toThrow('duplicate route registration')
+    })
+
+    it('throws when registering root twice', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/', 1)
+
+      expect(function () {
+        router.register('/', 2)
+      }).toThrow('duplicate route registration')
+    })
+
+    it('allows different paths that share a prefix', function ({ expect }) {
+      const router = createMatcher<number>()
+
+      router.register('/foo', 1)
+
+      expect(function () {
+        router.register('/foo/bar', 2)
+      }).not.toThrow()
+    })
+  })
 })

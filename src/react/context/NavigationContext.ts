@@ -10,4 +10,4 @@ import { createContext } from 'react'
  * The `useNavigation` hook throws a descriptive error when consumed
  * without a provider.
  */
-export const NavigationContext = createContext<Navigation>(null as unknown as Navigation)
+export const NavigationContext = createContext<Navigation | null>(null)
