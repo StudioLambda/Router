@@ -116,9 +116,7 @@ describe('useSearchParams', { concurrent: true }, function () {
   })
 
   it('setter accepts a function updater', function ({ expect, onTestFinished }) {
-    const { navigation, Wrapper } = createNavigationWrapper(
-      'https://example.com/page?existing=1'
-    )
+    const { navigation, Wrapper } = createNavigationWrapper('https://example.com/page?existing=1')
 
     const navigateSpy = vi.spyOn(navigation, 'navigate')
 
@@ -189,10 +187,7 @@ describe('useSearchParams', { concurrent: true }, function () {
     expect(navigateSpy).toHaveBeenCalledWith('/page?q=new#section', { history: 'replace' })
   })
 
-  it('returns empty search params when UrlContext is null', function ({
-    expect,
-    onTestFinished,
-  }) {
+  it('returns empty search params when UrlContext is null', function ({ expect, onTestFinished }) {
     const navigation = createMemoryNavigation({ url: 'https://example.com/' })
 
     /**
