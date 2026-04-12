@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.1.1] - 2026-04-12
+
+### ⚙️ Miscellaneous Tasks
+
+- Update documentation URL to docs.lambda-studio.com
 ## [2.1.0] - 2026-04-12
 
 ### 🚀 Features
@@ -9,6 +14,10 @@
 ### 🎨 Styling
 
 - Format skill files with oxfmt
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V2.1.0
 ## [2.0.0] - 2026-04-12
 
 ### 🐛 Bug Fixes
