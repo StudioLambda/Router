@@ -13,6 +13,7 @@ import { PathnameContext } from 'router/react:context/PathnameContext'
  * `PathnameContext` is provided.
  *
  * @returns The current pathname string (e.g. `"/user/42"`).
+ * @throws When used outside a Router or PathnameContext provider.
  *
  * @example
  * ```tsx
@@ -24,5 +25,11 @@ import { PathnameContext } from 'router/react:context/PathnameContext'
  * ```
  */
 export function usePathname(): string {
-  return use(PathnameContext)
+  const pathname = use(PathnameContext)
+
+  if (pathname === null) {
+    throw new Error('usePathname requires a <Router> or <PathnameContext> provider')
+  }
+
+  return pathname
 }

@@ -10,8 +10,32 @@ import { NavigationTypeContext } from 'router/react:context/NavigationTypeContex
  * Returns `null` before any navigation event has occurred
  * (i.e. on the initial render).
  *
+ * Must be used inside a `<Router>` component tree.
+ *
  * @returns The current NavigationType or null.
+ * @throws When used outside a Router or NavigationTypeContext
+ *   provider.
+ *
+ * @example
+ * ```tsx
+ * function PageTransition({ children }: { children: ReactNode }) {
+ *   const type = useNavigationType()
+ *   const isTraversal = type === 'traverse'
+ *
+ *   return (
+ *     <div className={isTraversal ? 'slide' : 'fade'}>
+ *       {children}
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 export function useNavigationType(): NavigationType | null {
-  return use(NavigationTypeContext)
+  const navigationType = use(NavigationTypeContext)
+
+  if (navigationType === undefined) {
+    throw new Error('useNavigationType requires a <Router> or <NavigationTypeContext> provider')
+  }
+
+  return navigationType
 }

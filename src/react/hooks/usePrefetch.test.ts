@@ -1,7 +1,7 @@
 import { describe, it, vi } from 'vitest'
 import { type ComponentType, createElement, type ReactNode } from 'react'
 import { renderHook } from 'router/react:test-helpers'
-import { usePrefetch } from './usePrefetch'
+import { clearPrefetchCache, usePrefetch } from './usePrefetch'
 import { MatcherContext } from 'router/react:context/MatcherContext'
 import { createMatcher } from 'router:matcher'
 import { type Handler } from 'router/react:router'
@@ -143,5 +143,96 @@ describe('usePrefetch', { concurrent: true }, function () {
     current('/ctx-route')
 
     expect(prefetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('deduplicates prefetch calls for the same pathname', function ({ expect, onTestFinished }) {
+    const prefetchSpy = vi.fn()
+    const matcher = createMatcher<Handler>()
+
+    matcher.register('/dedup', {
+      component: createStub(),
+      prefetch: prefetchSpy,
+    })
+
+    const { current, unmount } = renderHook(function () {
+      return usePrefetch({ matcher })
+    })
+
+    onTestFinished(unmount)
+
+    current('/dedup')
+    current('/dedup')
+    current('/dedup')
+
+    expect(prefetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows re-prefetch after clearPrefetchCache', function ({ expect, onTestFinished }) {
+    const prefetchSpy = vi.fn()
+    const matcher = createMatcher<Handler>()
+
+    matcher.register('/clearable', {
+      component: createStub(),
+      prefetch: prefetchSpy,
+    })
+
+    const { current, unmount } = renderHook(function () {
+      return usePrefetch({ matcher })
+    })
+
+    onTestFinished(unmount)
+
+    current('/clearable')
+
+    expect(prefetchSpy).toHaveBeenCalledTimes(1)
+
+    clearPrefetchCache(matcher)
+
+    current('/clearable')
+
+    expect(prefetchSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('clearPrefetchCache does not affect other matchers', function ({ expect, onTestFinished }) {
+    const prefetchSpy1 = vi.fn()
+    const prefetchSpy2 = vi.fn()
+
+    const matcher1 = createMatcher<Handler>()
+    const matcher2 = createMatcher<Handler>()
+
+    matcher1.register('/shared', {
+      component: createStub(),
+      prefetch: prefetchSpy1,
+    })
+
+    matcher2.register('/shared', {
+      component: createStub(),
+      prefetch: prefetchSpy2,
+    })
+
+    const { current: prefetch1, unmount: unmount1 } = renderHook(function () {
+      return usePrefetch({ matcher: matcher1 })
+    })
+
+    const { current: prefetch2, unmount: unmount2 } = renderHook(function () {
+      return usePrefetch({ matcher: matcher2 })
+    })
+
+    onTestFinished(unmount1)
+    onTestFinished(unmount2)
+
+    prefetch1('/shared')
+    prefetch2('/shared')
+
+    expect(prefetchSpy1).toHaveBeenCalledTimes(1)
+    expect(prefetchSpy2).toHaveBeenCalledTimes(1)
+
+    clearPrefetchCache(matcher1)
+
+    prefetch1('/shared')
+    prefetch2('/shared')
+
+    expect(prefetchSpy1).toHaveBeenCalledTimes(2)
+    expect(prefetchSpy2).toHaveBeenCalledTimes(1)
   })
 })

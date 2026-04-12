@@ -45,6 +45,15 @@ export interface PrecommitHandlerOptions {
  *   provides TransitionContext.
  * @throws When no transition tuple is provided and the
  *   hook is used outside a TransitionContext provider.
+ *
+ * @example
+ * ```tsx
+ * function CustomRouter() {
+ *   const transition = useTransition()
+ *   const { createHandler } = useNavigationHandlers(transition)
+ *   // use createHandler to build intercept handlers
+ * }
+ * ```
  */
 export function useNavigationHandlers(transition?: ReturnType<typeof useTransition>) {
   const contextTransition = transition ?? use(TransitionContext)

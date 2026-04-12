@@ -8,6 +8,21 @@ import { useNavigation } from 'router/react:hooks/useNavigation'
  *
  * @returns A navigate function that accepts a URL string and
  *   optional `NavigationNavigateOptions`.
+ *
+ * @example
+ * ```tsx
+ * function LogoutButton() {
+ *   const navigate = useNavigate()
+ *
+ *   return (
+ *     <button onClick={function () {
+ *       navigate('/login', { history: 'replace' })
+ *     }}>
+ *       Log Out
+ *     </button>
+ *   )
+ * }
+ * ```
  */
 export function useNavigate() {
   const navigation = useNavigation()

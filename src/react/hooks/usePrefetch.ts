@@ -26,6 +26,45 @@ export interface PrefetchOptions {
 const prefetchedByMatcher = new WeakMap<Matcher<Handler>, Set<string>>()
 
 /**
+ * Clears the prefetch deduplication cache for a specific
+ * matcher instance. After clearing, subsequent calls to the
+ * prefetch function will re-execute handlers for pathnames
+ * that were previously skipped.
+ *
+ * Useful when cached data becomes stale — for example after
+ * a user logs out, a form submission invalidates server
+ * state, or a known data expiry occurs.
+ *
+ * When called without a matcher argument, has no effect.
+ * The cache is automatically garbage-collected when the
+ * matcher instance is no longer referenced, so explicit
+ * clearing is only needed for long-lived matchers.
+ *
+ * @param matcher - The matcher whose prefetch cache should
+ *   be cleared.
+ *
+ * @example
+ * ```tsx
+ * function LogoutButton() {
+ *   const navigate = useNavigate()
+ *   const matcher = use(MatcherContext)
+ *
+ *   return (
+ *     <button onClick={function () {
+ *       clearPrefetchCache(matcher)
+ *       navigate('/login', { history: 'replace' })
+ *     }}>
+ *       Log Out
+ *     </button>
+ *   )
+ * }
+ * ```
+ */
+export function clearPrefetchCache(matcher: Matcher<Handler>) {
+  prefetchedByMatcher.delete(matcher)
+}
+
+/**
  * Returns a function that triggers the prefetch logic for a
  * given URL by resolving it against the matcher and calling
  * the route's prefetch function. Used by the Link component
@@ -43,6 +82,22 @@ const prefetchedByMatcher = new WeakMap<Matcher<Handler>, Set<string>>()
  * @param options - Optional matcher override.
  * @returns A function that accepts a URL string and invokes
  *   the matched route's prefetch handler, if any.
+ *
+ * @example
+ * ```tsx
+ * function PrefetchOnHover({ href, children }: Props) {
+ *   const prefetch = usePrefetch()
+ *
+ *   return (
+ *     <a
+ *       href={href}
+ *       onMouseEnter={function () { prefetch(href) }}
+ *     >
+ *       {children}
+ *     </a>
+ *   )
+ * }
+ * ```
  */
 export function usePrefetch(options?: PrefetchOptions) {
   const matcher = options?.matcher ?? use(MatcherContext)

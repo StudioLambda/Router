@@ -25,6 +25,17 @@ export interface NextMatchOptions {
  * @param options - Optional matcher override.
  * @returns A resolver function that takes a destination URL
  *   and a not-found component, returning the resolved match.
+ *
+ * @example
+ * ```tsx
+ * function CustomRouter() {
+ *   const resolve = useNextMatch()
+ *   const match = resolve(window.location.href, NotFound)
+ *   const Component = match.handler.component
+ *
+ *   return <Component />
+ * }
+ * ```
  */
 export function useNextMatch(options?: NextMatchOptions) {
   const matcher = options?.matcher ?? use(MatcherContext)
