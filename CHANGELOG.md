@@ -1,11 +1,24 @@
 # Changelog
 
+## [1.0.0] - 2026-04-12
+
+### 🐛 Bug Fixes
+
+- [**breaking**] Resolve medium-severity audit findings across router, hooks, and matcher
+
+### 🎨 Styling
+
+- Fix oxfmt formatting in useSearchParams test
 ## [0.1.1] - 2026-04-12
 
 ### 🐛 Bug Fixes
 
 - Resolve high-severity audit findings across matcher, router, CI, and build
 - Regenerate lockfile to resolve missing transitive deps on CI
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.1.1
 ## [0.1.0] - 2026-03-29
 
 ### 🚀 Features
