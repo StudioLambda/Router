@@ -1,10 +1,23 @@
 # Changelog
 
+## [2.1.0] - 2026-04-12
+
+### 🚀 Features
+
+- Add lambda-router agent skill for library consumers
+
+### 🎨 Styling
+
+- Format skill files with oxfmt
 ## [2.0.0] - 2026-04-12
 
 ### 🐛 Bug Fixes
 
 - [**breaking**] Resolve low-severity audit findings across hooks, contexts, and DX
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V2.0.0
 ## [1.0.0] - 2026-04-12
 
 ### 🐛 Bug Fixes
