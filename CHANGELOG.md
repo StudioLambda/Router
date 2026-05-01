@@ -1,10 +1,17 @@
 # Changelog
 
+## [2.1.2] - 2026-05-01
+
+### ⚙️ Miscellaneous Tasks
+
+- Move lambda-router skill to top-level skills/ folder
+- Ignore skills/ folder in oxfmt
 ## [2.1.1] - 2026-04-12
 
 ### ⚙️ Miscellaneous Tasks
 
 - Update documentation URL to docs.lambda-studio.com
+- *(release)* V2.1.1
 ## [2.1.0] - 2026-04-12
 
 ### 🚀 Features
