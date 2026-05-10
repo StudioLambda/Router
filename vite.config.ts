@@ -27,7 +27,7 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client'],
+      external: [/^react(-dom)?(\/.*)?$/],
     },
   },
   plugins: [
@@ -41,7 +41,7 @@ export default defineConfig({
     dts({
       include: ['**/*.ts*'],
       exclude: ['**/*.test.ts*'],
-      outDir: '../../dist',
+      outDirs: '../../dist',
       root: './src/router',
     }),
     dts({
@@ -53,7 +53,7 @@ export default defineConfig({
         '**/examples/**',
         '**/test-helpers.ts',
       ],
-      outDir: '../../dist',
+      outDirs: '../../dist',
       root: './src/react',
     }),
   ],
