@@ -1,11 +1,18 @@
 # Changelog
 
+## [2.1.3] - 2026-05-10
+
+### ⚙️ Miscellaneous Tasks
+
+- Upgrade dev dependencies and fix react externalization
+- Regenerate package-lock.json
 ## [2.1.2] - 2026-05-01
 
 ### ⚙️ Miscellaneous Tasks
 
 - Move lambda-router skill to top-level skills/ folder
 - Ignore skills/ folder in oxfmt
+- *(release)* V2.1.2
 ## [2.1.1] - 2026-04-12
 
 ### ⚙️ Miscellaneous Tasks
