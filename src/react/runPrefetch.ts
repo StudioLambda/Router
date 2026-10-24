@@ -24,8 +24,8 @@ export async function runPrefetch(
        * Forwards native validation and history/state options unchanged.
        * Failed redirects throw without marking the prefetch as redirected.
        */
-      redirect(url, options) {
-        context.controller.redirect(url, options)
+      redirect(...args) {
+        context.controller.redirect(...args)
         hasRedirected = true
       },
       /**

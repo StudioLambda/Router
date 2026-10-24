@@ -5,6 +5,7 @@ import { createRouter, type RouteFactory } from '../createRouter'
 import { ParamsContext } from '../context/ParamsContext'
 import { PathnameContext } from '../context/PathnameContext'
 import { Router } from './Router'
+import { type PrefetchContext } from '../router'
 
 /** Renders destination params and pathname to expose stale route contexts. */
 function Destination() {
@@ -58,8 +59,13 @@ function setup(configure: (route: RouteFactory) => void) {
      * Executes precommit, commit, then postcommit for a navigation type.
      * Traversals model noncancelable events and reject precommit handlers,
      * while ordinary pushes remain cancelable like in-app navigations.
+     * Non-null form data models POST ownership without sending a request.
      */
-    async navigate(path: string, navigationType: NavigationType = 'push') {
+    async navigate(
+      path: string,
+      navigationType: NavigationType = 'push',
+      formData: FormData | null = null
+    ) {
       /** Captures the initial dispatch-time intercept options. */
       let options: NavigationInterceptOptions = {}
       /** Shared destination object mutated by every native redirect. */
@@ -71,7 +77,7 @@ function setup(configure: (route: RouteFactory) => void) {
           canIntercept: true,
           hashChange: false,
           downloadRequest: null,
-          formData: null,
+          formData,
           destination,
           signal: new AbortController().signal,
           navigationType,
@@ -116,6 +122,69 @@ function setup(configure: (route: RouteFactory) => void) {
 }
 
 describe('Router redirect destinations', function () {
+  it('prefetches traversals after commit with destination params and middleware', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    /** Observes the URL at prefetch time to verify the postcommit boundary. */
+    const prefetch = vi.fn((_context: PrefetchContext) => {
+      expect(app.entry.url).toBe('https://example.com/target/42')
+    })
+    /** The route retains prefetch and layout behavior without precommit. */
+    const app = setup((route) => {
+      route('/target/:id').prefetch(prefetch).middleware([Layout]).render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    /** Traversal cannot install a native precommit handler. */
+    const options = await app.navigate('/target/42', 'traverse')
+
+    expect(options.precommitHandler).toBeUndefined()
+    expect(prefetch).toHaveBeenCalledOnce()
+    expect(prefetch.mock.calls[0][0].params).toEqual({ id: '42' })
+    expect(app.container.textContent).toBe('destination:42:/target/42')
+    expect(app.container.querySelector('section[data-destination]')).not.toBeNull()
+  })
+
+  it('rejects postcommit traversal redirects instead of bypassing their guards', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    /** Postcommit prefetch must propagate the rejecting controller's error. */
+    const app = setup((route) => {
+      route('/old').redirect('/target/42')
+      route('/target/:id').render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    await expect(app.navigate('/old', 'traverse')).rejects.toMatchObject({
+      name: 'InvalidStateError',
+    })
+    expect(app.entry.url).toBe('https://example.com/old')
+    expect(app.container.textContent).toBe('protected')
+  })
+
+  it('leaves unowned POSTs to redirect routes unintercepted', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    /** Neither the source guard nor the destination may run for native POST. */
+    const prefetch = vi.fn()
+    /** A redirect registration does not opt a route into form handling. */
+    const app = setup((route) => {
+      route('/old').prefetch(prefetch).redirect('/target/42')
+      route('/target/:id').prefetch(prefetch).render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    /** No handler means the browser retains ownership of the submitted body. */
+    const options = await app.navigate('/old', 'push', new FormData())
+
+    expect(options).toEqual({})
+    expect(prefetch).not.toHaveBeenCalled()
+    expect(app.container.textContent).toBe('protected')
+  })
+
   it('intercepts noncancelable traversals to plain routes without precommit', async function ({
     expect,
     onTestFinished,
