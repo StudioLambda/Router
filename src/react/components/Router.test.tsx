@@ -540,7 +540,7 @@ describe('Router', { concurrent: true }, function () {
         }),
       }
 
-      navigation.dispatchEvent(Object.assign(new Event('navigate'), event))
+      navigation.dispatchEvent(Object.assign(new Event('navigate', { cancelable: true }), event))
 
       expect(event.intercept).toHaveBeenCalled()
       expect(typeof interceptOptions.precommitHandler).toBe('function')

@@ -26,6 +26,31 @@ import { UrlContext } from 'router/react:context/UrlContext'
 import { extractPathname } from 'router/react:extractPathname'
 
 /**
+ * Preserves the prefetch context shape when the browser cannot delay commit.
+ * Unlike hover prefetch, navigation must not silently ignore redirect or
+ * handler-registration requests: neither operation is valid after commit.
+ */
+const postcommitController: NavigationPrecommitController = {
+  /**
+   * Rejects redirects because the destination has already committed.
+   * The rejection propagates through the intercepted navigation promise.
+   */
+  redirect() {
+    throw new DOMException('cannot redirect after navigation commit', 'InvalidStateError')
+  },
+  /**
+   * Rejects precommit-only handler registration rather than dropping work.
+   * Prefetch should await its own work on this post-commit path instead.
+   */
+  addHandler() {
+    throw new DOMException(
+      'cannot add a precommit handler after navigation commit',
+      'InvalidStateError'
+    )
+  },
+}
+
+/**
  * Internal state tracked alongside the resolved route match.
  * Includes the AbortSignal and navigation type from the
  * NavigateEvent that produced this match.
@@ -151,6 +176,20 @@ export interface RouterProps {
  * - `NavigationSignalContext` — the current AbortSignal
  * - `PathnameContext` — the current URL pathname
  * - `ParamsContext` — the extracted route parameters
+ *
+ * Noncancelable, interceptable events run prefetch after URL commit and
+ * before the React update. Rejection fails the navigation handler without
+ * rolling back the committed URL or updating the route. Their prefetch
+ * controller rejects `redirect()` and `addHandler()` with InvalidStateError.
+ * Native redirects also reject during traverse/reload, even if cancelable;
+ * this Router does not emulate redirects with a second navigation.
+ * See the HTML Standard's NavigateEvent.intercept() restrictions:
+ * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigateevent-intercept
+ *
+ * @example
+ * ```tsx
+ * <Router matcher={matcher} navigation={window.navigation} />
+ * ```
  */
 export function Router(props: RouterProps) {
   const contextNavigation = use(NavigationContext)
@@ -236,6 +275,19 @@ export function Router(props: RouterProps) {
         url: event.destination.url,
       })
     })
+
+    if (!event.cancelable && precommitHandler !== undefined) {
+      event.intercept({
+        async handler() {
+          await precommitHandler(postcommitController)
+          await handler()
+        },
+        scroll: match.handler.scroll,
+        focusReset: match.handler.focusReset,
+      })
+
+      return
+    }
 
     event.intercept({
       handler,
