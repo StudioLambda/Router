@@ -24,6 +24,13 @@ import { TransitionContext } from 'router/react:context/TransitionContext'
 import { PathnameContext } from 'router/react:context/PathnameContext'
 import { UrlContext } from 'router/react:context/UrlContext'
 import { extractPathname } from 'router/react:extractPathname'
+import { runPrefetch } from '../runPrefetch'
+
+/**
+ * Maximum redirect hops within one navigate event. A fixed bound prevents
+ * dynamic redirects from creating an infinite chain of distinct URLs.
+ */
+const MAX_REDIRECTS = 20
 
 /**
  * Internal state tracked alongside the resolved route match.
@@ -151,6 +158,18 @@ export interface RouterProps {
  * - `NavigationSignalContext` — the current AbortSignal
  * - `PathnameContext` — the current URL pathname
  * - `ParamsContext` — the extracted route parameters
+ *
+ * Redirect destinations are matched and prefetched before commit. Repeated
+ * URLs or chains exceeding 20 redirects reject the navigation. Scroll and
+ * focus options remain those of the first route: the Navigation API only
+ * permits intercept options to be set during event dispatch.
+ *
+ * @example
+ * const matcher = createRouter(route => {
+ *   route('/old').redirect('/home')
+ *   route('/home').render(Home)
+ * })
+ * // Render <Router matcher={matcher} navigation={window.navigation} />.
  */
 export function Router(props: RouterProps) {
   const contextNavigation = use(NavigationContext)
@@ -190,7 +209,7 @@ export function Router(props: RouterProps) {
    * This is necessary because Router provides TransitionContext
    * in its JSX return, which hasn't rendered at this point.
    */
-  const { createPrecommitHandler, createHandler } = useNavigationHandlers(transition)
+  const { createHandler } = useNavigationHandlers(transition)
 
   /**
    * Central navigate event handler. Intercepts all same-document
@@ -207,7 +226,8 @@ export function Router(props: RouterProps) {
       return
     }
 
-    const match = next(event.destination.url, notFound)
+    /** Final render match, replaced as redirects are processed in precommit. */
+    let match = next(event.destination.url, notFound)
 
     if (event.formData !== null && match.handler.formHandler !== undefined) {
       event.intercept({
@@ -221,11 +241,38 @@ export function Router(props: RouterProps) {
       return
     }
 
-    const precommitHandler = createPrecommitHandler({
-      prefetch: match.handler.prefetch,
-      params: match.params,
-      url: new URL(event.destination.url),
-    })
+    /**
+     * Follows mutations of this event's destination, not new navigate events.
+     * Each destination runs its own guards before any React state is updated.
+     * The hop bound also catches dynamic loops that generate unique URLs.
+     */
+    async function precommitHandler(controller: NavigationPrecommitController) {
+      /** Full URLs already processed, including query and fragment. */
+      const visited = new Set<string>()
+
+      for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+        /** Snapshot used for this route's params and prefetch context. */
+        const url = event.destination.url
+
+        if (visited.has(url)) {
+          throw new Error(`redirect cycle detected: ${url}`)
+        }
+
+        visited.add(url)
+        /** True even for a redirect back to the same destination URL. */
+        const hasRedirected = await runPrefetch(match.handler.prefetch, {
+          params: match.params,
+          url: new URL(url),
+          controller,
+        })
+
+        if (!hasRedirected) return
+
+        match = next(event.destination.url, notFound)
+      }
+
+      throw new Error(`redirect limit exceeded: maximum ${MAX_REDIRECTS} redirects`)
+    }
 
     const handler = createHandler(function () {
       setCurrent({
@@ -239,7 +286,7 @@ export function Router(props: RouterProps) {
 
     event.intercept({
       handler,
-      precommitHandler,
+      precommitHandler: match.handler.prefetch === undefined ? undefined : precommitHandler,
       scroll: match.handler.scroll,
       focusReset: match.handler.focusReset,
     })

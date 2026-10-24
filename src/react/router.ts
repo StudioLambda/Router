@@ -79,11 +79,17 @@ export interface PrefetchContext {
 
   /**
    * The precommit controller from the Navigation API,
-   * providing `redirect()` to abort the current navigation
-   * and redirect elsewhere, and `addHandler()` to register
+   * providing `redirect()` to mutate this navigation's destination
+   * before commit, and `addHandler()` to register
    * additional post-commit handlers. When prefetch is
    * triggered outside a real navigation (e.g. Link hover),
-   * this is a stub with no-op methods.
+   * this is a stub with no-op methods. Redirect destinations run their own
+   * prefetch before commit; a redirect stops subsequent builder prefetches.
+   *
+   * @example
+   * route('/private').prefetch(({ controller }) => {
+   *   controller.redirect('/login', { history: 'replace' })
+   * }).render(PrivatePage)
    */
   readonly controller: NavigationPrecommitController
 }
