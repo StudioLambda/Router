@@ -10,36 +10,46 @@ import { type Matcher } from 'router:matcher'
  * - `viewport` — prefetch fires when the element enters
  *   the viewport via an IntersectionObserver.
  * - `hover` — prefetch fires on `mouseenter`.
+ * @example `usePrefetchEffect(ref, { href: '/docs', on: 'hover' })`
  */
 export type PrefetchStrategy = 'viewport' | 'hover'
 
 /**
- * Options for the `usePrefetchEffect` hook.
+ * DOM trigger configuration for speculative prefetch. Both href and on are
+ * required keys, but undefined disables useful prefetch work. The matcher
+ * attempt cache remains independent of the DOM trigger's once setting.
+ * @example `usePrefetchEffect(ref, { href: '/docs', on: 'viewport', once: false })`
  */
 export interface PrefetchEffectOptions {
   /**
    * The URL to prefetch. When undefined, the effect is
-   * a no-op (no observer or listener is attached).
+   * a no-op when the trigger fires, even if a listener/observer is attached.
+   * Relative URLs resolve against `http://localhost/`.
+   * @example `usePrefetchEffect(ref, { href: '/docs', on: 'hover' })`
    */
   href: string | undefined
 
   /**
    * Prefetch trigger strategy. When undefined, the effect
    * is a no-op — no proactive prefetch is set up.
+   * @example `usePrefetchEffect(ref, { href: '/docs', on: undefined })`
    */
   on: PrefetchStrategy | undefined
 
   /**
    * Whether to only prefetch once. When true, hover
    * listeners use the `{ once }` option and viewport
-   * observers disconnect after the first intersection.
-   * Defaults to `true`.
+   * observers disconnect after their first callback, including one with no
+   * intersecting entry. Defaults to `true`. False keeps the trigger active
+   * but does not bypass the per-matcher pathname attempt cache.
+   * @example `usePrefetchEffect(ref, { href: '/docs', on: 'hover', once: false })`
    */
   once?: boolean
 
   /**
    * Optional matcher override. When omitted, reads from
    * `MatcherContext` via `usePrefetch`.
+   * @example `usePrefetchEffect(ref, { href: '/docs', on: 'hover', matcher })`
    */
   matcher?: Matcher<Handler>
 }
@@ -50,8 +60,12 @@ export interface PrefetchEffectOptions {
  * or a mouseenter listener (for `hover` strategy) that
  * triggers route prefetching when activated.
  *
- * When `on` is undefined or `href` is undefined, no
- * observer or listener is attached — the hook is a no-op.
+ * When `on` is undefined, no listener/observer is attached. An undefined
+ * href suppresses calls from the trigger but does not prevent attachment.
+ * Cleanup removes listeners/observers, not already started work. Viewport
+ * mode requires IntersectionObserver support. Expected speculative errors
+ * should be handled inside the prefetch callback; this hook ignores results
+ * and does not catch errors or rejections. Guards are not invoked.
  *
  * This hook is used internally by the Link component and
  * can also be used standalone to add prefetch behavior to
@@ -61,6 +75,7 @@ export interface PrefetchEffectOptions {
  *   element must be mounted before the effect runs.
  * @param options - Configuration for the prefetch behavior
  *   including the URL, trigger strategy, and matcher.
+ * @returns Nothing; registers effect cleanup for the DOM subscription.
  *
  * @example
  * ```tsx
@@ -80,8 +95,8 @@ export function usePrefetchEffect(ref: RefObject<Element | null>, options: Prefe
   /**
    * IntersectionObserver callback that triggers prefetch
    * when the element enters the viewport. Disconnects
-   * the observer after the first intersection when `once`
-   * is true.
+   * the observer after its first callback when `once` is true, even if none
+   * of the entries intersected. It does not reset the matcher attempt cache.
    */
   const onViewportIntersection = useEffectEvent<IntersectionObserverCallback>(
     function (entries, observer) {

@@ -4,12 +4,16 @@ import { type Handler } from 'router/react:router'
 import { type Matcher, type Resolved } from 'router:matcher'
 
 /**
- * Options for the `useNextMatch` hook.
+ * Route table selection for URL resolution. This only matches; it does not
+ * execute guards or prefetch and is not a safe replacement for Router.
+ * @example `const resolve = useNextMatch({ matcher })`
  */
 export interface NextMatchOptions {
   /**
    * Optional matcher override. When omitted the hook reads
    * from `MatcherContext`.
+   * Defaults to an empty matcher without a provider.
+   * @example `const resolve = useNextMatch({ matcher })`
    */
   matcher?: Matcher<Handler>
 }
@@ -21,19 +25,22 @@ export interface NextMatchOptions {
  *
  * Used internally by the Router to determine which component
  * to render for an incoming navigation event.
+ * This resolver does not run guards, prefetch, redirects, or middleware.
+ * Relative URLs resolve against `http://localhost/`; null/empty destinations
+ * return the fallback match with empty params, without matching `/`.
  *
  * @param options - Optional matcher override.
  * @returns A resolver function that takes a destination URL
  *   and a not-found component, returning the resolved match.
+ * @throws TypeError from the returned resolver for a malformed URL.
  *
  * @example
  * ```tsx
- * function CustomRouter() {
+ * function MatchPreview() {
  *   const resolve = useNextMatch()
- *   const match = resolve(window.location.href, NotFound)
- *   const Component = match.handler.component
+ *   const match = resolve('/users/42', NotFound)
  *
- *   return <Component />
+ *   return <pre>{JSON.stringify(match.params)}</pre>
  * }
  * ```
  */

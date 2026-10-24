@@ -77,8 +77,8 @@ interface CurrentState {
 
   /**
    * The AbortSignal from the NavigateEvent that produced
-   * this match. Aborts when the navigation is cancelled
-   * by a newer navigation or the user pressing Stop.
+   * this match. It follows the native event's cancellation lifetime,
+   * not the lifetime of the rendered route or component.
    * Null for the initial render before any navigation event.
    */
   signal: AbortSignal | null
@@ -120,32 +120,46 @@ function InitialGuard(props: { check?: Promise<void>; children: ReactNode }) {
 }
 
 /**
- * Props accepted by the Router component.
+ * Configuration for one Router instance. Router renders its matched route;
+ * it does not accept children. Put shared UI in middleware or use explicit
+ * context providers for siblings that need router hooks.
+ * @example
+ * ```tsx
+ * const props: RouterProps = { matcher, fallback: <p>Loading…</p> }
+ * const app = <Router {...props} />
+ * ```
  */
 export interface RouterProps {
   /**
    * Route matcher instance with registered routes. When
    * omitted, falls back to the value from MatcherContext.
+   * That context defaults to an empty matcher, so omission can show 404.
+   * @example `<Router matcher={createRouter(route => route('/').render(Home))} />`
    */
   matcher?: Matcher<Handler>
 
   /**
    * Component to render when no route matches the current
    * URL. Defaults to the built-in NotFound component.
+   * @example `<Router matcher={matcher} notFound={() => <h1>Missing page</h1>} />`
    */
   notFound?: ComponentType
 
   /**
    * Suspense fallback shown while lazy route components
-   * or suspended middleware are loading.
+   * or suspended middleware are loading, including asynchronous initial
+   * guards. Does not replace an error boundary and may not show for a
+   * transition that retains previously revealed content.
+   * @example `<Router matcher={matcher} fallback={<p>Loading…</p>} />`
    */
   fallback?: ReactNode
 
   /**
-   * Native Navigation object override. Defaults to the value
-   * from NavigationContext, which itself falls back to
-   * `window.navigation`. Useful for testing or providing
+   * Native Navigation object override. Router reads NavigationContext when
+   * omitted, then falls back to `window.navigation`. Useful for providing
    * a custom navigation instance.
+   * Memory navigation holds a fixed URL and does not simulate navigation.
+   * @example `<Router matcher={matcher} navigation={createMemoryNavigation({ url: 'https://example.com/' })} />`
    */
   navigation?: Navigation
 
@@ -155,6 +169,13 @@ export interface RouterProps {
    * this when you need to read `isPending` above the Router
    * in the component tree, or to share a single transition
    * across multiple Routers.
+   * @example
+   * ```tsx
+   * function App() {
+   *   const transition = useTransition()
+   *   return <Router matcher={matcher} transition={transition} />
+   * }
+   * ```
    */
   transition?: ReturnType<typeof useTransition>
 
@@ -163,6 +184,8 @@ export interface RouterProps {
    * Fires in sync with the Navigation API's `navigatesuccess`
    * event. Wrapped in `useEffectEvent` internally so inline
    * arrow functions don't cause effect churn.
+   * This is a native lifecycle event, not an initial-render notification.
+   * @example `<Router matcher={matcher} onNavigateSuccess={() => analytics.pageView()} />`
    */
   onNavigateSuccess?: () => void
 
@@ -174,6 +197,9 @@ export interface RouterProps {
    *
    * @param error - The error that caused the navigation
    *   to fail.
+   * Initial guard errors instead reach an ancestor error boundary or SSR
+   * host. A postcommit failure does not roll back the browser URL.
+   * @example `<Router matcher={matcher} onNavigateError={error => console.error(error)} />`
    */
   onNavigateError?: (error: unknown) => void
 }
@@ -208,8 +234,8 @@ export interface RouterProps {
  * - `ParamsContext` — the extracted route parameters
  *
  * Mandatory route guards run before initial content, including SSR. Async
- * initial guards show `fallback`; rejected checks reach an ancestor error
- * boundary (or the SSR host). Checks must be idempotent because React can
+ * initial guards suspend behind `fallback`; rejected checks reach an ancestor
+ * error boundary (or the SSR host). Checks must be idempotent because React can
  * repeat initialization, including under StrictMode. Initial prefetch is
  * deliberately not executed: move access checks to `.guard()` instead.
  *
@@ -221,8 +247,8 @@ export interface RouterProps {
  * <Router matcher={matcher} fallback={<p>Checking access…</p>} />
  * ```
  *
- * Redirect destinations are matched and prefetched before commit. Repeated
- * URLs or chains exceeding 20 redirects reject the navigation. Scroll and
+ * Redirect destinations are matched, guarded, then prefetched before commit.
+ * Repeated URLs or chains exceeding 20 redirects reject navigation. Scroll and
  * focus options remain those of the first route: the Navigation API only
  * permits intercept options to be set during event dispatch.
  *
@@ -236,6 +262,14 @@ export interface RouterProps {
  * either the abandoned action or a destination action with the original body.
  * See the HTML Standard's NavigateEvent.intercept() restrictions:
  * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigateevent-intercept
+ *
+ * @param props - Route table, navigation adapter, and render/lifecycle options.
+ * @returns Providers and the guarded matched component, or the 404 component.
+ * @throws Error when no navigation prop, provider, or browser API exists.
+ *   Synchronous initial guard errors propagate during render; asynchronous
+ *   failures propagate through React use(). Initial prefetch/redirects do
+ *   not run. Streaming SSR can await guards; renderToString emits fallback
+ *   for pending checks instead of awaiting them.
  *
  * @example
  * ```tsx

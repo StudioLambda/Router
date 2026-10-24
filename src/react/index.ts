@@ -1,3 +1,19 @@
+/**
+ * React 19 routing on the browser Navigation API. Register components with
+ * createRouter and mount Router; use middleware for layouts and mandatory
+ * guards for initial/navigation checks, never as server authorization.
+ * For SSR, supply createMemoryNavigation with the request URL. It is a
+ * fixed-location adapter, not a client history implementation or polyfill.
+ *
+ * @example
+ * ```tsx
+ * import { createRouter, Router } from '@studiolambda/router/react'
+ * const matcher = createRouter(route => {
+ *   route('/').render(() => <h1>Home</h1>)
+ * })
+ * const app = <Router matcher={matcher} />
+ * ```
+ */
 export * from 'router/react:components/Middlewares'
 export * from 'router/react:components/Router'
 export * from 'router/react:components/NotFound'

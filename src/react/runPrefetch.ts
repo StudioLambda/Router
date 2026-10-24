@@ -4,7 +4,14 @@ import { type PrefetchContext, type PrefetchFunc } from './router'
  * Runs one prefetch and reports successful controller redirects, including
  * redirects to the same URL. The native controller retains ownership of URL
  * validation, history options, and added postcommit handlers. Errors propagate
- * so the Navigation API can reject the navigation before commit.
+ * so the intercepted navigation can fail. On a postcommit path, failure
+ * cannot undo the URL commit. This helper does not execute guards or rematch
+ * destinations: Router owns those steps after a successful redirect.
+ *
+ * @param prefetch - Optional callback; omission resolves to false.
+ * @param context - Destination snapshot and phase-appropriate controller.
+ * @returns Whether a controller redirect completed without throwing.
+ * @throws Propagates callback/controller errors as a rejected promise.
  *
  * @example
  * const redirected = await runPrefetch(handler.prefetch, context)

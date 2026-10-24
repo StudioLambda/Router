@@ -75,14 +75,14 @@ Groups create scoped route factories. Child routes inherit:
 
 ```tsx
 const router = createRouter(function (route) {
-  // Config-only group (no path prefix, just middleware)
-  const authed = route().middleware([Auth]).group()
-  authed('/dashboard').render(Dashboard) // /dashboard, with Auth
+  // Mandatory checks are separate from render-time layout.
+  const authed = route().guard(requireSession).middleware([AppLayout]).group()
+  authed('/dashboard').render(Dashboard) // checked before layout/content
 
   // Path prefix + middleware group
-  const admin = authed('/admin').middleware([AdminGuard]).group()
-  admin('/users').render(AdminUsers) // /admin/users, with Auth + AdminGuard
-  admin('/config').render(AdminConfig) // /admin/config, with Auth + AdminGuard
+  const admin = authed('/admin').guard(requireAdmin).group()
+  admin('/users').render(AdminUsers) // /admin/users, both guards then AppLayout
+  admin('/config').render(AdminConfig) // /admin/config, both guards then AppLayout
 
   // Prefetch inheritance
   const api = route('/api')
@@ -100,6 +100,7 @@ const router = createRouter(function (route) {
 ```
 
 **Group isolation**: sibling builders do not affect each other. Config only flows downward.
+Scroll, focusReset, and formHandler are route-local: groups do not inherit them.
 
 ## Redirects
 
@@ -126,9 +127,20 @@ Redirects do **NOT** inherit:
 - scroll behavior
 - focusReset
 
-Redirects **DO** run during the precommit phase via `controller.redirect()`, so the URL never commits to the address bar.
+Redirects inherit guards and prefetches. Guards run first; a prefetch redirect
+stops later callbacks in the abandoned chain. Router rematches each target,
+then runs its guards and prefetch before committing the final destination.
+The target receives its own params and URL, not the source route's context.
 
-Static redirect cycles are detected at build time and throw. Callback redirects are not checked.
+Native `controller.redirect()` only works for cancelable push/replace events.
+Traverse/reload redirects reject; postcommit redirect/addHandler attempts throw
+InvalidStateError. No second navigation is synthesized. Initial loads do not
+run redirect prefetch; the redirect fallback renders null, so the host must
+handle initial/SSR redirects. Scroll/focus options remain from the first match.
+
+Exact static-string redirect cycles throw during createRouter. Callback
+targets are checked only at runtime; repeated full URLs or more than 20 hops
+reject navigation. Unmatched targets render the configured not-found component.
 
 ## Prefetch Functions
 
@@ -142,7 +154,9 @@ interface PrefetchContext {
 }
 ```
 
-Prefetch runs during the Navigation API's precommit phase (before URL commits). Use it for:
+Prefetch runs before URL commit for cancelable navigations, or after commit
+for noncancelable interceptable events. In either case guards run first.
+Use it for:
 
 - Data preloading
 - Module preloading
@@ -175,13 +189,17 @@ route('/private')
   .render(PrivatePage)
 ```
 
-Guards run before initial content (including SSR), and before prefetch during
-precommit for intercepted navigations and custom form actions. Throw/reject to
+Guards run before initial content (including SSR), and before prefetch for
+intercepted navigations and custom form actions. Cancelable events run checks
+precommit; noncancelable interceptable events run them postcommit. Rejection
+cannot undo an already committed URL. Throw/reject to
 deny access; return/resolve to permit it. Parent guards run before child guards,
 and a failure stops the chain. Guards have no redirect controller. The host
 handles initial redirects and SSR error responses. Initial client failures
 reach an ancestor error boundary; navigation failures use `onNavigateError`.
 
+One synchronous initial check can throw immediately. Multiple guards compose
+into an asynchronous chain even when each check is synchronous.
 Async initial checks suspend middleware and route content behind the Router's
 `fallback`. Streaming SSR waits; `renderToString` emits the fallback rather
 than waiting for async checks. Checks must be idempotent because remounts,
@@ -191,7 +209,7 @@ request.
 Migration: move authentication checks out of `.prefetch()` into `.guard()`;
 leave optional data/module warming in prefetch. Guards never run for Link
 hover/viewport prefetch. Speculative prefetch can still call its data sources;
-use it only for safe requests. Legacy initial prefetch behavior is unchanged.
+use it only for safe requests. Initial prefetch remains disabled.
 
 Guards protect router UI/action dispatch, not server resources. Every server
 endpoint must authorize each request independently, including native forms.
@@ -202,12 +220,16 @@ endpoint must authorize each request independently, including native forms.
 type FormHandler = (formData: FormData, event: NavigateEvent) => void | Promise<void>
 ```
 
-When a navigation includes `formData` and the matched route has a `formHandler`, it is called instead of the normal render flow.
+When a navigation includes `formData` and the original matched route has a
+`formHandler`, Router owns that custom submission. Otherwise POST stays native:
+Router runs no guards/prefetch and the browser sends the body to the server.
+GET forms have no submitted FormData on the event and follow normal rendering.
 
-Guards and legacy prefetch are awaited before the custom action. A thrown or
-rejected check prevents the action. This adds prefetch to the custom-action
-path; previously that path skipped it. Do not use prefetch side effects that
-assume only a component navigation can invoke them.
+Guards and prefetch are awaited before a custom action. Throw/reject prevents
+dispatch. If precommit redirects to another URL, Router guards/prefetches the
+target and renders it without invoking either action or forwarding the original
+body. An unchanged custom action does not update the rendered route. Backend
+authorization is still required, and action failures do not undo mutations.
 
 ```tsx
 route('/search')
@@ -226,7 +248,7 @@ The `Handler` interface registered in the matcher:
 interface Handler {
   component: ComponentType // route component to render
   guard?: GuardFunc // mandatory initial/navigation/action check
-  prefetch?: PrefetchFunc // precommit prefetch
+  prefetch?: PrefetchFunc // optional warming; phase depends on cancelability
   middlewares?: ComponentType<MiddlewareProps>[] // middleware chain
   scroll?: NavigationScrollBehavior // "after-transition" | "manual"
   focusReset?: NavigationFocusReset // "after-transition" | "manual"

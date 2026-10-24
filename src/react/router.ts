@@ -28,6 +28,7 @@ export interface Handler {
    * The React component to render for this route.
    * Can be a regular component or a `lazy()` component
    * for code-split routes.
+   * @example `const handler: Handler = { component: () => null }`
    */
   readonly component: ComponentType
 
@@ -54,6 +55,9 @@ export interface Handler {
    * Middleware components that wrap the route component.
    * Applied via reduceRight so the first middleware in
    * the array wraps outermost, and the last wraps innermost.
+   * These run during rendering, after mandatory checks; they cannot gate
+   * speculative prefetch or custom actions.
+   * @example `const handler: Handler = { component: Page, middlewares: [Layout] }`
    */
   readonly middlewares?: ComponentType<MiddlewareProps>[]
 
@@ -63,7 +67,8 @@ export interface Handler {
    * - `after-transition` (default): browser handles scrolling
    *   after the handler promise resolves.
    * - `manual`: disables automatic scrolling so the route
-   *   component can call `event.scroll()` manually.
+   *   application manages scrolling. Route components receive no event prop.
+   * @example `const handler: Handler = { component: Feed, scroll: 'manual' }`
    */
   readonly scroll?: NavigationScrollBehavior
 
@@ -73,6 +78,7 @@ export interface Handler {
    *   element or the body after the handler resolves.
    * - `manual`: disables automatic focus reset so the route
    *   component can manage focus manually.
+   * @example `const handler: Handler = { component: Editor, focusReset: 'manual' }`
    */
   readonly focusReset?: NavigationFocusReset
 
@@ -82,6 +88,9 @@ export interface Handler {
    * has a formHandler, it is called instead of the normal
    * component render flow, after guards and prefetch complete. A check
    * failure prevents the action; backend authorization remains required.
+   * When absent, POST remains native without running guards or prefetch.
+   * Redirected custom actions render the checked target and do not dispatch
+   * the submitted body to either the source or target action.
    *
    * @example
    * ```ts
@@ -96,6 +105,8 @@ export interface Handler {
  * There is no redirect controller: returning permits access, while throwing
  * denies it. Handle initial failures with a React error boundary or the SSR
  * host; handle navigation failures through `onNavigateError`.
+ * Objects are shared with prefetch on navigations. Treat params and URL as
+ * read-only even though their JavaScript contents are mutable.
  *
  * @example
  * ```ts
@@ -133,6 +144,13 @@ export interface GuardContext {
  * Checks may repeat on remount, SSR/hydration, and React StrictMode retries;
  * they must not perform mutations. This is a UI gate, not a replacement for
  * server authorization. Asynchronous initial checks suspend the route subtree.
+ * Multiple inherited checks are chained asynchronously even if each check
+ * is synchronous. A lone synchronous initial check can throw immediately.
+ * Noncancelable events run checks after commit: denial cannot undo that URL.
+ *
+ * @param context - Matched params and destination URL; do not mutate them.
+ * @returns Nothing, or a promise that resolves to allow access.
+ * @throws Any thrown error or rejected promise denies content/action dispatch.
  *
  * @example
  * ```ts
@@ -161,6 +179,8 @@ export interface PrefetchContext {
    * Dynamic route parameters extracted from the matched URL
    * pattern. For example, a route registered as `/user/:id`
    * matching `/user/42` produces `{ id: '42' }`.
+   * Treat the record as read-only; values remain URL-encoded.
+   * @example `const prefetch: PrefetchFunc = ({ params }) => loadUser(params.id)`
    */
   readonly params: Record<string, string>
 
@@ -169,6 +189,8 @@ export interface PrefetchContext {
    * the pathname, search parameters, and hash. Useful for
    * constructing query keys or reading search params during
    * prefetch.
+   * Treat the URL as read-only; redirects use the controller instead.
+   * @example `const prefetch: PrefetchFunc = ({ url }) => loadSearch(url.search)`
    */
   readonly url: URL
 
@@ -182,8 +204,10 @@ export interface PrefetchContext {
    * prefetch runs after commit and both methods throw InvalidStateError.
    * Native `redirect()` only supports push/replace, not traverse/reload
    * even when cancelable. No follow-up navigation is synthesized.
-   * Successful precommit redirects run the destination's own prefetch
-   * before commit and stop subsequent callbacks in the abandoned chain.
+   * Router rematches successful precommit redirects, runs destination guards
+   * then prefetch before commit, and stops the abandoned callback chain.
+   * During speculation a redirect does not navigate or preload the target,
+   * though the builder's chained prefetch stops later source callbacks.
    *
    * @example
    * ```ts
@@ -206,6 +230,10 @@ export interface PrefetchContext {
  *   destination URL, and the precommit controller.
  * @returns Void or a promise that resolves when prefetching
  *   is complete.
+ * @throws Errors and rejections propagate to intercepted navigation/action
+ *   failure. Speculative callers must handle failures themselves; the once-
+ *   per-pathname cache records attempts even when they fail. Never rely on
+ *   prefetch for mandatory checks or assume guards ran before speculation.
  * @example
  * ```ts
  * const prefetch: PrefetchFunc = async ({ params }) => {
@@ -245,6 +273,17 @@ export type RedirectTarget = string | ((context: PrefetchContext) => string)
  *   the form submission.
  * @returns Void or a promise that resolves when the form
  *   submission handling is complete.
+ * @throws Errors/rejections fail the intercepted navigation. Router does not
+ *   turn them into a rendered error page or undo server-side mutations.
+ * @example
+ * ```ts
+ * const save: FormHandler = async (data, event) => {
+ *   const response = await fetch('/api/contact', {
+ *     method: 'POST', body: data, signal: event.signal,
+ *   })
+ *   if (!response.ok) throw new Error('contact submission failed')
+ * }
+ * ```
  */
 export type FormHandler = {
   (formData: FormData, event: NavigateEvent): void | Promise<void>
@@ -253,14 +292,23 @@ export type FormHandler = {
 /**
  * Props passed to middleware wrapper components. Each middleware
  * receives `children` and decides whether to render them,
- * enabling patterns like authentication guards and layout
- * wrappers.
+ * enabling layouts and context providers. Render-time conditional content
+ * is not a mandatory check: use GuardFunc to gate navigation and actions.
+ * @example
+ * ```tsx
+ * function Layout({ children }: MiddlewareProps) {
+ *   return <main>{children}</main>
+ * }
+ * const handler: Handler = { component: Page, middlewares: [Layout] }
+ * ```
  */
 export interface MiddlewareProps {
   /**
    * The downstream content to render. A middleware can choose
    * to render this directly, wrap it in additional providers,
-   * or omit it entirely (e.g. for auth redirects).
+   * or omit it entirely. Omitting content does not prevent route prefetch or
+   * form actions, which have already passed the mandatory guard phase.
+   * @example `function Layout({ children }: MiddlewareProps) { return <main>{children}</main> }`
    */
   children: ReactNode
 }

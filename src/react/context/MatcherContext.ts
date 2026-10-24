@@ -10,5 +10,10 @@ import { createMatcher, type Matcher } from 'router:matcher'
  * `usePrefetch` consume this context to resolve URLs against
  * registered route patterns. Override by passing a `matcher`
  * prop to Router or wrapping with `<MatcherContext value={...}>`.
+ * @example
+ * ```tsx
+ * const matcher = createMatcher<Handler>()
+ * const view = <MatcherContext value={matcher}><Link href="/docs">Docs</Link></MatcherContext>
+ * ```
  */
 export const MatcherContext = createContext<Matcher<Handler>>(createMatcher())

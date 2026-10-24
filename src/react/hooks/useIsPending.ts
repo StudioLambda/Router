@@ -5,6 +5,8 @@ import { TransitionContext } from 'router/react:context/TransitionContext'
  * Returns whether a navigation transition is currently pending.
  * This reflects the `isPending` value from the `useTransition`
  * tuple managed by the Router component.
+ * It is not an initial-guard or precommit pending indicator; those checks
+ * run outside the transition. React can retain already revealed content.
  *
  * Useful for displaying loading indicators, progress bars, or
  * adjusting UI opacity while a route transition is in progress.

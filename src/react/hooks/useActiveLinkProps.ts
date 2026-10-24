@@ -3,18 +3,22 @@ import { PathnameContext } from 'router/react:context/PathnameContext'
 import { extractPathname } from 'router/react:extractPathname'
 
 /**
- * Options for the `useActiveLinkProps` hook.
+ * Pathname comparison settings for useActiveLinkProps. Search, hash, and
+ * origin are ignored; this does not determine whether a URL is same-origin.
+ * @example `const active = useActiveLinkProps('/docs', { exact: false })`
  */
 export interface ActiveLinkOptions {
   /**
    * When true, the link is only considered active when
    * the current pathname exactly matches the href
    * pathname. When false, the link is active when the
-   * current pathname starts with the href pathname,
+   * current pathname equals the href pathname or starts with it plus `/`,
    * which is useful for parent navigation items that
    * should highlight when any child route is active.
    *
    * Defaults to `true`.
+   * `/docs` matches `/docs/api`, not `/docs-old`; `/` is not a catch-all.
+   * @example `useActiveLinkProps('/docs', { exact: false })`
    */
   exact?: boolean
 }
@@ -22,12 +26,18 @@ export interface ActiveLinkOptions {
 /**
  * Props returned by the hook to spread onto an anchor
  * element for active link styling and accessibility.
+ * @example
+ * ```tsx
+ * const { props } = useActiveLinkProps('/docs')
+ * const link = <a href="/docs" {...props}>Docs</a>
+ * ```
  */
 export interface ActiveLinkProps {
   /**
    * Present (set to `true`) when the link is active.
    * Absent (`undefined`) when inactive. Use the
    * `a[data-active]` CSS selector for styling.
+   * @example `const isMarked = useActiveLinkProps('/docs').props['data-active']`
    */
   'data-active': true | undefined
 
@@ -35,6 +45,7 @@ export interface ActiveLinkProps {
    * Set to `'page'` when the link is active to indicate
    * to assistive technologies that this link represents
    * the current page. Absent when inactive.
+   * @example `<a href="/docs" {...useActiveLinkProps('/docs').props}>Docs</a>`
    */
   'aria-current': 'page' | undefined
 }
@@ -51,8 +62,9 @@ export interface ActiveLinkProps {
  * Also returns an `isActive` boolean for conditional logic
  * like dynamic class names.
  *
- * Must be used inside a `<Router>` component tree where
- * `PathnameContext` is provided.
+ * Without a PathnameContext provider it returns inactive attributes rather
+ * than throwing. Relative hrefs resolve against `http://localhost/`, not
+ * the current location. Invalid URLs throw during pathname extraction.
  *
  * @param href - The href to compare against the current
  *   pathname. When undefined, the link is never active.
@@ -60,15 +72,16 @@ export interface ActiveLinkProps {
  *   prefix matching.
  * @returns An object with `isActive` boolean and `props`
  *   to spread onto the element.
+ * @throws TypeError for an invalid href when pathname context is available.
  *
  * @example
  * ```tsx
- * function NavItem({ href, children }: NavItemProps) {
+ * function NavItem({ href }: { href: string }) {
  *   const { isActive, props } = useActiveLinkProps(href)
  *
  *   return (
  *     <a href={href} className={isActive ? 'active' : ''} {...props}>
- *       {children}
+ *       Docs
  *     </a>
  *   )
  * }

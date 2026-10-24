@@ -5,6 +5,12 @@
  * lookup.
  *
  * @typeParam T - The handler type associated with each route.
+ * @example
+ * ```ts
+ * const matcher: Matcher<string> = createMatcher()
+ * matcher.register('/users/:id', 'user')
+ * const result = matcher.match('/users/42')
+ * ```
  */
 export interface Matcher<T> {
   /**
@@ -17,6 +23,14 @@ export interface Matcher<T> {
    *
    * @param pattern - The URL path pattern to register.
    * @param handler - The handler to associate with this pattern.
+   * @throws Error for duplicate routes or conflicting dynamic/wildcard names.
+   * Registration mutates the trie; a failed registration is not rolled back.
+   * Use defined handlers: `undefined` represents an unregistered trie node.
+   * @example
+   * ```ts
+   * const matcher = createMatcher<string>()
+   * matcher.register('/users/:id', 'user')
+   * ```
    */
   readonly register: (pattern: string, handler: T) => void
 
@@ -29,6 +43,14 @@ export interface Matcher<T> {
    *
    * @param path - The URL path to match (e.g. `/user/42`).
    * @returns The resolved match with handler and params, or null.
+   * Empty slash-separated segments are ignored. Values remain URL-encoded;
+   * query strings and hashes must be removed by the caller before matching.
+   * @example
+   * ```ts
+   * const matcher = createMatcher<string>()
+   * matcher.register('/users/:id', 'user')
+   * const id = matcher.match('/users/42/')?.params.id // '42'
+   * ```
    */
   readonly match: (path: string) => Resolved<T> | null
 }
@@ -39,10 +61,17 @@ export interface Matcher<T> {
  * dynamic parameters.
  *
  * @typeParam T - The handler type associated with the route.
+ * @example
+ * ```ts
+ * const matcher = createMatcher<string>()
+ * matcher.register('/users/:id', 'user')
+ * const match: Resolved<string> | null = matcher.match('/users/42')
+ * ```
  */
 export interface Resolved<T> {
   /**
    * The handler that was registered for the matched route pattern.
+   * @example `matcher.match('/users/42')?.handler` returns the registered value.
    */
   readonly handler: T
 
@@ -52,8 +81,7 @@ export interface Resolved<T> {
    * values are the corresponding URL segments.
    *
    * @example
-   * Pattern `/user/:id` matched against `/user/42`
-   * produces `{ id: "42" }`.
+   * `matcher.match('/user/42')?.params.id` is `'42'` for `/user/:id`.
    */
   readonly params: Record<string, string>
 }
@@ -62,11 +90,19 @@ export interface Resolved<T> {
  * Configuration options for creating a new matcher instance.
  *
  * @typeParam T - The handler type associated with each route.
+ * @example
+ * ```ts
+ * const options: Options<string> = { root: { children: new Map() } }
+ * const matcher = createMatcher(options)
+ * ```
  */
 export interface Options<T> {
   /**
    * An existing trie root node to use instead of creating
    * an empty one. Useful for pre-built or shared route trees.
+   * Retained and mutated, not copied; matchers sharing a root see each
+   * other's registrations. Omit it for independent route tables.
+   * @example `createMatcher<string>({ root: { children: new Map() } })`
    */
   readonly root?: Node<T>
 }
@@ -80,11 +116,18 @@ export interface Options<T> {
  * of the path).
  *
  * @typeParam T - The handler type associated with each route.
+ * @example
+ * ```ts
+ * const root: Node<string> = { children: new Map() }
+ * const matcher = createMatcher({ root })
+ * matcher.register('/users', 'list') // mutates root.children
+ * ```
  */
 export interface Node<T> {
   /**
    * Map of static child segments. Each key is a literal path
    * segment string (e.g. `"user"`, `"posts"`).
+   * @example `const root: Node<string> = { children: new Map() }`
    */
   readonly children: Map<string, Node<T>>
 
@@ -92,27 +135,31 @@ export interface Node<T> {
    * The handler registered at this node, or `undefined` if
    * this node is only an intermediate segment in a longer
    * pattern.
+   * @example `const leaf: Node<string> = { children: new Map(), handler: 'list' }`
    */
   handler?: T
 
   /**
    * The single dynamic child node for `:param` segments.
    * Only one dynamic segment is allowed per trie level.
+   * @example `root.child = { children: new Map(), name: 'id', handler: 'user' }`
    */
   child?: Node<T>
 
   /**
-   * The parameter name for this dynamic segment (without the
-   * `:` prefix). Only set on nodes created from `:param`
-   * patterns.
+   * Capture name without the `:` or `*` prefix. Set on dynamic and
+   * wildcard nodes; static nodes do not need a name.
+   * @example `const dynamic: Node<string> = { children: new Map(), name: 'id' }`
    */
   readonly name?: string
 
   /**
    * The wildcard child node for `*param` segments. Captures
    * all remaining path segments into a single parameter.
-   * Only one wildcard is allowed per trie level and it must
-   * be the last segment in the pattern.
+   * Only one wildcard child exists per trie level. Put it last in the
+   * pattern: registration does not reject later segments, but matching
+   * cannot resolve handlers below the wildcard node.
+   * @example `root.wildcard = { children: new Map(), name: 'path', handler: 'file' }`
    */
   wildcard?: Node<T>
 }
@@ -127,12 +174,19 @@ export interface Node<T> {
  *
  * Wildcard segments capture all remaining path segments into a
  * single parameter joined by `/`. A bare `*` captures into
- * a param named `'*'`. Wildcards must be the last segment
- * in a pattern.
+ * a param named `'*'`. Put wildcards last: registration does not validate
+ * this constraint, but matching only resolves a handler directly on the
+ * wildcard node. Wildcards require at least one remaining segment.
  *
  * @typeParam T - The handler type associated with each route.
  * @param options - Optional configuration with a pre-built root node.
  * @returns A matcher instance with `register` and `match` methods.
+ * @example
+ * ```ts
+ * const matcher = createMatcher<string>()
+ * matcher.register('/files/*path', 'file')
+ * const path = matcher.match('/files/a/b')?.params.path // 'a/b'
+ * ```
  */
 export function createMatcher<T>(options?: Options<T>): Matcher<T> {
   const root: Node<T> = options?.root ?? { children: new Map() }
@@ -141,7 +195,8 @@ export function createMatcher<T>(options?: Options<T>): Matcher<T> {
    * Registers a route pattern by walking/creating trie nodes
    * for each segment and attaching the handler at the leaf.
    * Wildcard segments (`*param`) create a terminal wildcard
-   * node — no further segments are allowed after a wildcard.
+   * node. Callers must place wildcards last; registration itself does not
+   * reject later segments, which matching cannot resolve.
    *
    * @param pattern - The URL path pattern to register.
    * @param handler - The handler to store at the leaf node.

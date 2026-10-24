@@ -5,6 +5,7 @@ import { useNavigation } from 'router/react:hooks/useNavigation'
  * Return value from the `useBack` hook, providing both
  * a traversal function and a boolean indicating whether
  * backward navigation is possible.
+ * @example `const { back, canGoBack }: UseBackResult = useBack()`
  */
 export interface UseBackResult {
   /**
@@ -15,6 +16,12 @@ export interface UseBackResult {
    *   `info` to pass data to the navigate event handler.
    * @returns The NavigationResult with `committed` and
    *   `finished` promises.
+   * @example
+   * ```ts
+   * const { back } = useBack()
+   * const result = back()
+   * Promise.all([result.committed, result.finished]).catch(console.error)
+   * ```
    */
   readonly back: (options?: NavigationOptions) => NavigationResult
 
@@ -22,7 +29,9 @@ export interface UseBackResult {
    * Whether backward navigation is possible. Mirrors
    * `navigation.canGoBack` from the Navigation API.
    * Reactively updates when navigations change the
-   * history stack. When false, calling `back()` will throw.
+   * history stack. Native failed traversals reject the result promises;
+   * memory navigation instead returns its unchanged, resolved entry.
+   * @example `<button disabled={!canGoBack}>Back</button>`
    */
   readonly canGoBack: boolean
 }
@@ -41,6 +50,7 @@ export interface UseBackResult {
  * Must be used inside a `<Router>` component tree.
  *
  * @returns An object with `back` and `canGoBack`.
+ * @throws Error when no NavigationContext provider is available.
  *
  * @example
  * ```tsx
@@ -48,7 +58,10 @@ export interface UseBackResult {
  *   const { back, canGoBack } = useBack()
  *
  *   return (
- *     <button onClick={back} disabled={!canGoBack}>
+ *     <button onClick={() => {
+ *       const result = back()
+ *       Promise.all([result.committed, result.finished]).catch(console.error)
+ *     }} disabled={!canGoBack}>
  *       Go Back
  *     </button>
  *   )

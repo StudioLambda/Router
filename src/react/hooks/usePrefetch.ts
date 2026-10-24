@@ -4,24 +4,25 @@ import { type Handler, type PrefetchContext } from 'router/react:router'
 import { type Matcher } from 'router:matcher'
 
 /**
- * Options for the `usePrefetch` hook.
+ * Route table selection for speculative preloading. Omission uses the
+ * nearest MatcherContext, whose default is an empty route table.
+ * @example `const prefetch = usePrefetch({ matcher })`
  */
 export interface PrefetchOptions {
   /**
    * Optional matcher override. When omitted the hook reads
    * from `MatcherContext`.
+   * @example `const prefetch = usePrefetch({ matcher })`
    */
   matcher?: Matcher<Handler>
 }
 
 /**
  * Tracks URL pathnames that have already been prefetched,
- * keyed by matcher instance. Using a WeakMap ensures that
- * each matcher (and therefore each Router) gets its own
- * dedup set, and the set is garbage-collected when the
- * matcher is no longer referenced. This prevents cross-
- * contamination between independent Router instances and
- * between isolated test environments.
+ * keyed by matcher instance. Routers sharing a matcher share this attempt
+ * cache. Independent matchers do not share attempts. The WeakMap permits
+ * collection when the matcher is no longer referenced. Entries are added
+ * before calling prefetch and remain after failures; query/hash are ignored.
  */
 const prefetchedByMatcher = new WeakMap<Matcher<Handler>, Set<string>>()
 
@@ -35,7 +36,9 @@ const prefetchedByMatcher = new WeakMap<Matcher<Handler>, Set<string>>()
  * a user logs out, a form submission invalidates server
  * state, or a known data expiry occurs.
  *
- * When called without a matcher argument, has no effect.
+ * Requires the exact matcher used for speculative prefetch. This only
+ * clears attempt bookkeeping, not application data, in-flight promises,
+ * module caches, or one-shot DOM listeners/observers.
  * The cache is automatically garbage-collected when the
  * matcher instance is no longer referenced, so explicit
  * clearing is only needed for long-lived matchers.
@@ -71,9 +74,14 @@ export function clearPrefetchCache(matcher: Matcher<Handler>) {
  * for hover and viewport prefetch strategies.
  *
  * Each pathname is prefetched at most once per matcher
- * instance per page session. Subsequent calls with the same
+ * instance until clearPrefetchCache is called. Subsequent calls with the same
  * pathname are no-ops, preventing thundering-herd problems
  * when many Links point to the same destination.
+ * The cache records attempts, not success: failures remain cached, query
+ * variants share a key, and duplicate callers receive undefined rather than
+ * the in-flight promise. `once={false}` does not bypass this cache. Real
+ * navigation prefetch does not use it. Guards never run speculatively, so
+ * preload only safe requests and authorize each request on the server.
  *
  * Since prefetch triggered from Link happens outside of a
  * navigation event, a stub NavigationPrecommitController is
@@ -82,18 +90,27 @@ export function clearPrefetchCache(matcher: Matcher<Handler>) {
  * @param options - Optional matcher override.
  * @returns A function that accepts a URL string and invokes
  *   the matched route's prefetch handler, if any.
+ * @throws TypeError for malformed URLs or any synchronous prefetch error.
+ *   Async failures reject the returned promise. Link/usePrefetchEffect do
+ *   not observe rejections; handle expected failures in the preload itself.
  *
  * @example
  * ```tsx
- * function PrefetchOnHover({ href, children }: Props) {
+ * function PrefetchOnHover({ href }: { href: string }) {
  *   const prefetch = usePrefetch()
  *
  *   return (
  *     <a
  *       href={href}
- *       onMouseEnter={function () { prefetch(href) }}
+ *       onMouseEnter={function () {
+ *         try {
+ *           Promise.resolve(prefetch(href)).catch(console.error)
+ *         } catch (error) {
+ *           console.error(error)
+ *         }
+ *       }}
  *     >
- *       {children}
+ *       Open page
  *     </a>
  *   )
  * }

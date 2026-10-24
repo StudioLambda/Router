@@ -2,13 +2,21 @@ import { useEffect, useEffectEvent } from 'react'
 
 /**
  * Callbacks for navigation lifecycle events. All callbacks
- * are optional — only provided callbacks are subscribed.
+ * are optional; the hook subscribes to all three native events and forwards
+ * only supplied callbacks. These events do not report initial render errors.
+ * @example
+ * ```ts
+ * const handlers: NavigationEventHandlers = { onNavigateError: console.error }
+ * useNavigationEvents(navigation, handlers)
+ * ```
  */
 export interface NavigationEventHandlers {
   /**
-   * Called when a same-document navigation is initiated.
+   * Called when the native object dispatches a navigate event. Check
+   * canIntercept before taking ownership; some events leave the document.
    * The Router uses this to intercept the event, match
    * the destination URL, and trigger a React transition.
+   * @example `useNavigationEvents(navigation, { onNavigate: event => console.log(event.destination.url) })`
    */
   readonly onNavigate?: (event: NavigateEvent) => void
 
@@ -16,6 +24,7 @@ export interface NavigationEventHandlers {
    * Called after a navigation completes successfully.
    * Fires in sync with the Navigation API's
    * `navigatesuccess` event.
+   * @example `useNavigationEvents(navigation, { onNavigateSuccess: () => analytics.pageView() })`
    */
   readonly onNavigateSuccess?: () => void
 
@@ -26,6 +35,7 @@ export interface NavigationEventHandlers {
    *
    * @param error - The error that caused the navigation
    *   to fail.
+   * @example `useNavigationEvents(navigation, { onNavigateError: console.error })`
    */
   readonly onNavigateError?: (error: unknown) => void
 }
@@ -44,6 +54,7 @@ export interface NavigationEventHandlers {
  * @param navigation - The Navigation object to subscribe to.
  * @param handlers - Callbacks for each navigation lifecycle
  *   event. All are optional.
+ * @returns Nothing; listeners are removed on unmount or instance replacement.
  *
  * @example
  * ```tsx

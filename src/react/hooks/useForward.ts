@@ -5,6 +5,7 @@ import { useNavigation } from 'router/react:hooks/useNavigation'
  * Return value from the `useForward` hook, providing both
  * a traversal function and a boolean indicating whether
  * forward navigation is possible.
+ * @example `const { forward, canGoForward }: UseForwardResult = useForward()`
  */
 export interface UseForwardResult {
   /**
@@ -15,6 +16,12 @@ export interface UseForwardResult {
    *   `info` to pass data to the navigate event handler.
    * @returns The NavigationResult with `committed` and
    *   `finished` promises.
+   * @example
+   * ```ts
+   * const { forward } = useForward()
+   * const result = forward()
+   * Promise.all([result.committed, result.finished]).catch(console.error)
+   * ```
    */
   readonly forward: (options?: NavigationOptions) => NavigationResult
 
@@ -22,8 +29,9 @@ export interface UseForwardResult {
    * Whether forward navigation is possible. Mirrors
    * `navigation.canGoForward` from the Navigation API.
    * Reactively updates when navigations change the
-   * history stack. When false, calling `forward()` will
-   * throw.
+   * history stack. Native failed traversals reject the result promises;
+   * memory navigation instead returns its unchanged, resolved entry.
+   * @example `<button disabled={!canGoForward}>Forward</button>`
    */
   readonly canGoForward: boolean
 }
@@ -42,6 +50,7 @@ export interface UseForwardResult {
  * Must be used inside a `<Router>` component tree.
  *
  * @returns An object with `forward` and `canGoForward`.
+ * @throws Error when no NavigationContext provider is available.
  *
  * @example
  * ```tsx
@@ -49,7 +58,10 @@ export interface UseForwardResult {
  *   const { forward, canGoForward } = useForward()
  *
  *   return (
- *     <button onClick={forward} disabled={!canGoForward}>
+ *     <button onClick={() => {
+ *       const result = forward()
+ *       Promise.all([result.committed, result.finished]).catch(console.error)
+ *     }} disabled={!canGoForward}>
  *       Go Forward
  *     </button>
  *   )
