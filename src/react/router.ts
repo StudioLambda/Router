@@ -104,6 +104,8 @@ export interface PrefetchContext {
    * prefetch runs after commit and both methods throw InvalidStateError.
    * Native `redirect()` only supports push/replace, not traverse/reload
    * even when cancelable. No follow-up navigation is synthesized.
+   * Successful precommit redirects run the destination's own prefetch
+   * before commit and stop subsequent callbacks in the abandoned chain.
    *
    * @example
    * ```ts

@@ -2,7 +2,7 @@ import { act, createElement, use } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 import { createMatcher } from 'router:matcher'
-import { type Handler, type PrefetchFunc } from 'router/react:router'
+import { type Handler, type PrefetchContext, type PrefetchFunc } from 'router/react:router'
 import { ParamsContext } from 'router/react:context/ParamsContext'
 import { PathnameContext } from 'router/react:context/PathnameContext'
 import { UrlContext } from 'router/react:context/UrlContext'
@@ -168,10 +168,15 @@ describe('Router history navigation capabilities', () => {
     )
   })
 
-  it('keeps cancelable push prefetch before commit with the native controller', async ({
+  it('keeps cancelable push prefetch before commit and forwards native handler registration', async ({
     onTestFinished,
   }) => {
-    const prefetch = vi.fn()
+    /** Native postcommit work must survive the redirect-observing wrapper. */
+    const addedHandler = vi.fn()
+    /** Registers work during precommit rather than relying on controller identity. */
+    const prefetch = vi.fn((context: PrefetchContext) => {
+      context.controller.addHandler(addedHandler)
+    })
     const view = renderHistoryRouter(prefetch)
     onTestFinished(view.unmount)
     const event = createNavigateEvent({ cancelable: true, navigationType: 'push' })
@@ -187,8 +192,12 @@ describe('Router history navigation capabilities', () => {
     expect(prefetch).toHaveBeenCalledWith({
       params: { id: '42' },
       url: new URL('https://example.com/user/42?tab=profile'),
-      controller,
+      controller: {
+        redirect: expect.any(Function),
+        addHandler: expect.any(Function),
+      },
     })
+    expect(controller.addHandler).toHaveBeenCalledWith(addedHandler)
 
     view.entry.url = event.destination.url
     await act(async () => {

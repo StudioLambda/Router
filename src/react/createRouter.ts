@@ -1,4 +1,5 @@
 import { type ComponentType } from 'react'
+import { runPrefetch } from './runPrefetch'
 import { createMatcher, type Matcher } from 'router:matcher'
 import {
   type FormHandler,
@@ -116,10 +117,16 @@ export interface RouteBuilder {
    * or group. When multiple prefetch functions are chained
    * (from parent groups and the route itself), they execute
    * sequentially: parent prefetches run first, then this
-   * route's, in the order they were added.
+   * route's, in the order they were added. A successful redirect stops
+   * the remaining callbacks; Router then prefetches the new destination.
    *
    * @param fn - The prefetch function to add.
    * @returns The builder for further chaining.
+   *
+   * @example
+   * route('/private').prefetch(({ controller }) => {
+   *   controller.redirect('/login')
+   * }).render(PrivatePage)
    */
   prefetch(fn: PrefetchFunc): RouteBuilder
 
@@ -175,6 +182,9 @@ export interface RouteBuilder {
    * precommit handler calls `controller.redirect(target)`
    * before the URL commits, avoiding any component render
    * or visual flash.
+   * Inherited and local prefetch guards run first and can override the
+   * redirect. Router resolves and prefetches every destination before commit.
+   * This applies to navigate events, not the initial render of the page.
    *
    * The target can be a static absolute path string, or a
    * callback that receives the prefetch context and returns
@@ -265,8 +275,9 @@ function joinPaths(prefix: string, path: string): string {
 
 /**
  * Combines an array of prefetch functions into a single
- * `PrefetchFunc` that calls each one sequentially. Returns
- * `undefined` when the array is empty.
+ * `PrefetchFunc` that calls each one sequentially until one redirects.
+ * Later callbacks belong to the abandoned route and must not run after a
+ * guard redirects. Returns `undefined` when the array is empty.
  *
  * @param prefetches - The prefetch functions to chain.
  * @returns A single combined prefetch function, or undefined.
@@ -280,18 +291,19 @@ function chainPrefetches(prefetches: PrefetchFunc[]): PrefetchFunc | undefined {
     return prefetches[0]
   }
 
+  /** Runs guards in registration order, abandoning the chain on redirect. */
   return async function (context: PrefetchContext) {
     for (const fn of prefetches) {
-      await fn(context)
+      if (await runPrefetch(fn, context)) return
     }
   }
 }
 
 /**
  * A no-op React component used as the `component` field for
- * redirect routes. Never actually renders because the
- * precommit redirect fires before the URL commits, but the
- * `Handler` interface requires a component.
+ * redirect routes because the `Handler` interface requires a component.
+ * Intercepted navigations replace this match before commit. An initial
+ * render does not run precommit, so direct loads still render this fallback.
  */
 function RedirectFallback() {
   return null
@@ -460,11 +472,15 @@ function createRouteFactory(
 
         const handler: Handler = {
           component: RedirectFallback,
-          prefetch: function (context) {
-            const resolved = typeof target === 'function' ? target(context) : target
+          prefetch: chainPrefetches([
+            ...inherited.prefetches,
+            ...state.prefetches,
+            function (context) {
+              const resolved = typeof target === 'function' ? target(context) : target
 
-            context.controller.redirect(resolved)
-          },
+              context.controller.redirect(resolved)
+            },
+          ]),
         }
 
         matcher.register(fullPath, handler)
