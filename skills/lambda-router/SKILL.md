@@ -28,6 +28,9 @@ metadata:
    Follow root `AGENTS.md` for mandatory same-change skill maintenance and
    validation. Explain any checks that could not run; root `tsc --noEmit`
    checks no files and is not a production typecheck.
+4. For dependency or development-tool upgrades, read
+   [toolchain.md](references/toolchain.md). Validate the installed peer graph,
+   coverage provider, declaration output, and packed package before release.
 
 ## Start with a route table
 
