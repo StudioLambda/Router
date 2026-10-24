@@ -1,11 +1,21 @@
 # Changelog
 
+## [3.0.0] - 2026-10-24
+
+### 🐛 Bug Fixes
+
+- [**breaking**] Gate initial routes and custom actions with mandatory checks
+- Reconcile route guards with integrated navigation fixes
 ## [2.1.6] - 2026-10-24
 
 ### 🐛 Bug Fixes
 
 - Resolve redirected routes before navigation commits
 - Integrate redirects with native navigation capabilities
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V2.1.6
 ## [2.1.5] - 2026-10-24
 
 ### 🐛 Bug Fixes
