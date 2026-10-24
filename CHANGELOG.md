@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.6] - 2026-10-24
+
+### 🐛 Bug Fixes
+
+- Resolve redirected routes before navigation commits
+- Integrate redirects with native navigation capabilities
 ## [2.1.5] - 2026-10-24
 
 ### 🐛 Bug Fixes
@@ -9,6 +15,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Merge main and verify POST navigation ownership
+- *(release)* V2.1.5
 ## [2.1.4] - 2026-10-24
 
 ### 🐛 Bug Fixes
