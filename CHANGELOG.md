@@ -1,10 +1,19 @@
 # Changelog
 
+## [3.0.2] - 2026-10-24
+
+### ⚙️ Miscellaneous Tasks
+
+- Refresh development dependencies and adopt Node 26
 ## [3.0.1] - 2026-10-24
 
 ### 📚 Documentation
 
 - Document public APIs and maintain agent skills
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V3.0.1
 ## [3.0.0] - 2026-10-24
 
 ### 🐛 Bug Fixes
