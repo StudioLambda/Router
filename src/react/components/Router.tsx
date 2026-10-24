@@ -32,6 +32,12 @@ import { extractPathname } from 'router/react:extractPathname'
  */
 interface CurrentState {
   /**
+   * Pending initial check, retained above Suspense so retries do not restart
+   * it. Navigation matches omit this because precommit already checked them.
+   */
+  initialCheck?: Promise<void>
+
+  /**
    * The resolved route match containing the handler
    * configuration and extracted URL parameters.
    */
@@ -66,6 +72,19 @@ interface CurrentState {
    * `navigation.currentEntry` during render.
    */
   url: string | null
+}
+
+/**
+ * Waits for an asynchronous initial check inside the Router's Suspense
+ * boundary, before rendering middleware or route content. Rejections reach
+ * the application's error boundary; synchronous checks run in initialization.
+ */
+function InitialGuard(props: { check?: Promise<void>; children: ReactNode }) {
+  if (props.check !== undefined) {
+    use(props.check)
+  }
+
+  return props.children
 }
 
 /**
@@ -151,6 +170,20 @@ export interface RouterProps {
  * - `NavigationSignalContext` — the current AbortSignal
  * - `PathnameContext` — the current URL pathname
  * - `ParamsContext` — the extracted route parameters
+ *
+ * Mandatory route guards run before initial content, including SSR. Async
+ * initial guards show `fallback`; rejected checks reach an ancestor error
+ * boundary (or the SSR host). Checks must be idempotent because React can
+ * repeat initialization, including under StrictMode. Initial prefetch is
+ * deliberately not executed: move access checks to `.guard()` instead.
+ *
+ * @example
+ * ```tsx
+ * const matcher = createRouter(route => {
+ *   route('/private').guard(requireSession).render(PrivatePage)
+ * })
+ * <Router matcher={matcher} fallback={<p>Checking access…</p>} />
+ * ```
  */
 export function Router(props: RouterProps) {
   const contextNavigation = use(NavigationContext)
@@ -174,9 +207,26 @@ export function Router(props: RouterProps) {
 
   const [current, setCurrent] = useState<CurrentState>(function () {
     const url = navigation.currentEntry?.url ?? null
+    const match = next(url, notFound)
+    /**
+     * A real URL is available from browser/memory navigation. Match the
+     * existing root fallback when an implementation has no current entry.
+     */
+    const check = match.handler.guard?.({
+      params: match.params,
+      url: new URL(url ?? '/', 'http://localhost'),
+    })
+
+    /**
+     * StrictMode may discard an initializer result. Observe its rejection
+     * even in that case; the retained original promise still rejects through
+     * React's use() and reaches the error boundary, never granting access.
+     */
+    check?.catch(() => {})
 
     return {
-      match: next(url, notFound),
+      match,
+      initialCheck: check ?? undefined,
       signal: null,
       navigationType: null,
       pathname: extractPathname(url),
@@ -208,9 +258,16 @@ export function Router(props: RouterProps) {
     }
 
     const match = next(event.destination.url, notFound)
+    const precommitHandler = createPrecommitHandler({
+      guard: match.handler.guard,
+      prefetch: match.handler.prefetch,
+      params: match.params,
+      url: new URL(event.destination.url),
+    })
 
     if (event.formData !== null && match.handler.formHandler !== undefined) {
       event.intercept({
+        precommitHandler,
         scroll: match.handler.scroll,
         focusReset: match.handler.focusReset,
         async handler() {
@@ -220,12 +277,6 @@ export function Router(props: RouterProps) {
 
       return
     }
-
-    const precommitHandler = createPrecommitHandler({
-      prefetch: match.handler.prefetch,
-      params: match.params,
-      url: new URL(event.destination.url),
-    })
 
     const handler = createHandler(function () {
       setCurrent({
@@ -264,9 +315,11 @@ export function Router(props: RouterProps) {
                 <UrlContext value={current.url}>
                   <ParamsContext value={current.match.params}>
                     <Suspense fallback={props.fallback}>
-                      <Middlewares value={middlewares}>
-                        <CurrentComponent />
-                      </Middlewares>
+                      <InitialGuard check={current.initialCheck}>
+                        <Middlewares value={middlewares}>
+                          <CurrentComponent />
+                        </Middlewares>
+                      </InitialGuard>
                     </Suspense>
                   </ParamsContext>
                 </UrlContext>

@@ -1,15 +1,35 @@
 import { type TransitionFunction, use, useTransition } from 'react'
 import { TransitionContext } from 'router/react:context/TransitionContext'
-import { type PrefetchFunc, type PrefetchContext } from 'router/react:router'
+import { type GuardFunc, type PrefetchFunc, type PrefetchContext } from 'router/react:router'
 
 /**
  * Options for creating a precommit handler that forwards
- * route context to the prefetch function.
+ * route context to mandatory guards and optional prefetch functions.
+ *
+ * @example
+ * ```ts
+ * createPrecommitHandler({ guard: requireSession, params: {}, url })
+ * ```
  */
 export interface PrecommitHandlerOptions {
   /**
+   * Mandatory check awaited before prefetch. Failure rejects precommit,
+   * preventing the associated content update or custom form action.
+   * @example
+   * ```ts
+   * createPrecommitHandler({ guard: requireSession, params: {}, url })
+   * ```
+   */
+  readonly guard?: GuardFunc
+
+  /**
    * The prefetch function from the matched route handler.
-   * When undefined, no precommit handler is created.
+   * When both prefetch and guard are undefined, no handler is created.
+   *
+   * @example
+   * ```ts
+   * createPrecommitHandler({ prefetch: loadPageData, params: {}, url })
+   * ```
    */
   readonly prefetch?: PrefetchFunc
 
@@ -28,7 +48,7 @@ export interface PrecommitHandlerOptions {
 /**
  * Creates handler functions for the Navigation API's
  * `event.intercept()` method. The precommit handler runs
- * prefetch logic before the URL commits; the handler runs
+ * mandatory guards then prefetch before the URL commits; the handler runs
  * the React state transition after the URL commits.
  *
  * Accepts an optional `transition` tuple to use directly.
@@ -66,17 +86,16 @@ export function useNavigationHandlers(transition?: ReturnType<typeof useTransiti
 
   /**
    * Creates a precommit handler that constructs a
-   * `PrefetchContext` from the matched route information
-   * and forwards it to the route's prefetch function.
+   * `PrefetchContext` from the matched route information, awaits mandatory
+   * guards, and only then forwards context to optional prefetch. Rejection
+   * propagates to the Navigation API and prevents the post-commit handler.
    * Runs before the URL commits, so no React state
    * transitions are needed here.
    */
   function createPrecommitHandler(options: PrecommitHandlerOptions) {
-    if (options.prefetch === undefined) {
+    if (options.guard === undefined && options.prefetch === undefined) {
       return undefined
     }
-
-    const prefetch = options.prefetch
 
     return async function (controller: NavigationPrecommitController) {
       const context: PrefetchContext = {
@@ -85,7 +104,8 @@ export function useNavigationHandlers(transition?: ReturnType<typeof useTransiti
         controller,
       }
 
-      await prefetch(context)
+      await options.guard?.({ params: options.params, url: options.url })
+      await options.prefetch?.(context)
     }
   }
 

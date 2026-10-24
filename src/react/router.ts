@@ -4,8 +4,26 @@ import { type ReactNode, type ComponentType } from 'react'
  * Defines the route handler configuration for a matched route.
  * Contains the component to render, optional prefetch logic,
  * middleware components, scroll/focus behavior, and form handling.
+ *
+ * @example
+ * ```ts
+ * const handler: Handler = { component: PrivatePage, guard: requireSession }
+ * matcher.register('/private', handler)
+ * ```
  */
 export interface Handler {
+  /**
+   * Mandatory check before initial content, navigation, or a custom action.
+   * Unlike prefetch, this never runs speculatively on hover. Throw or reject
+   * to deny access; server endpoints must still authorize every request.
+   *
+   * @example
+   * ```ts
+   * const handler: Handler = { component: PrivatePage, guard: requireSession }
+   * ```
+   */
+  readonly guard?: GuardFunc
+
   /**
    * The React component to render for this route.
    * Can be a regular component or a `lazy()` component
@@ -14,9 +32,14 @@ export interface Handler {
   readonly component: ComponentType
 
   /**
-   * Optional prefetch function invoked during the precommit phase.
-   * Receives a context with matched route params, destination URL,
-   * and the precommit controller for redirects.
+   * Optional preload invoked after guards during navigation/action
+   * precommit, or speculatively without guards by Link/usePrefetch.
+   * Not invoked on initial rendering; use `guard` for mandatory checks.
+   *
+   * @example
+   * ```ts
+   * const handler: Handler = { component: Page, prefetch: loadPageData }
+   * ```
    */
   readonly prefetch?: PrefetchFunc
 
@@ -50,10 +73,68 @@ export interface Handler {
    * Optional handler for form submissions (POST navigations).
    * When a navigation includes FormData and the matched route
    * has a formHandler, it is called instead of the normal
-   * component render flow.
+   * component render flow, after guards and prefetch complete. A check
+   * failure prevents the action; backend authorization remains required.
+   *
+   * @example
+   * ```ts
+   * const handler: Handler = { component: Page, formHandler: saveForm }
+   * ```
    */
   readonly formHandler?: FormHandler
 }
+
+/**
+ * Route information available to mandatory checks, including during SSR.
+ * There is no redirect controller: returning permits access, while throwing
+ * denies it. Handle initial failures with a React error boundary or the SSR
+ * host; handle navigation failures through `onNavigateError`.
+ *
+ * @example
+ * ```ts
+ * const requireSession: GuardFunc = ({ url }) => {
+ *   if (!session.canRead(url.pathname)) throw new Error('access denied')
+ * }
+ * ```
+ */
+export interface GuardContext {
+  /**
+   * Parameters extracted from the destination pathname, without mutation.
+   * @example
+   * ```ts
+   * const guard: GuardFunc = ({ params }) => checkAccount(params.id)
+   * ```
+   */
+  readonly params: Record<string, string>
+
+  /**
+   * Destination URL, including search and hash. Treat it as read-only.
+   * @example
+   * ```ts
+   * const guard: GuardFunc = ({ url }) => checkPath(url.pathname)
+   * ```
+   */
+  readonly url: URL
+}
+
+/**
+ * Mandatory, idempotent route check. Return normally (or resolve) to allow
+ * access; throw or reject to prevent content rendering or action execution.
+ * Runs on initial render, including SSR, and before prefetch on intercepted
+ * navigations and custom form actions. Never runs for speculative prefetch.
+ *
+ * Checks may repeat on remount, SSR/hydration, and React StrictMode retries;
+ * they must not perform mutations. This is a UI gate, not a replacement for
+ * server authorization. Asynchronous initial checks suspend the route subtree.
+ *
+ * @example
+ * ```ts
+ * const requireSession: GuardFunc = async ({ params }) => {
+ *   if (!(await session.canRead(params.id))) throw new Error('access denied')
+ * }
+ * ```
+ */
+export type GuardFunc = (context: GuardContext) => void | Promise<void>
 
 /**
  * Context passed to prefetch functions during the precommit
