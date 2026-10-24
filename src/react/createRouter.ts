@@ -3,6 +3,8 @@ import { runPrefetch } from './runPrefetch'
 import { createMatcher, type Matcher } from 'router:matcher'
 import {
   type FormHandler,
+  type GuardContext,
+  type GuardFunc,
   type Handler,
   type MiddlewareProps,
   type PrefetchContext,
@@ -16,6 +18,12 @@ import {
  * routes merge their own configuration with the parent's.
  */
 interface InheritedConfig {
+  /**
+   * Mandatory checks inherited in parent-first order. Kept separate from
+   * prefetch so initial rendering can check access without warming data.
+   */
+  readonly guards: GuardFunc[]
+
   /**
    * Path prefix accumulated from parent groups. Each group
    * that specifies a path appends it to this prefix. Child
@@ -45,6 +53,12 @@ interface InheritedConfig {
  * inherited config when a terminal method is called.
  */
 interface BuilderState {
+  /**
+   * Local mandatory checks appended after inherited checks when consumed.
+   * Each builder owns its array so sibling routes remain isolated.
+   */
+  guards: GuardFunc[]
+
   /**
    * The path segment for this route, or undefined when the
    * builder is used purely for group-level configuration.
@@ -90,6 +104,7 @@ interface BuilderState {
  * Chainable methods (return the builder for further chaining):
  * - `.middleware()` — appends middleware components
  * - `.prefetch()` — adds a prefetch function to the chain
+ * - `.guard()` — adds a mandatory initial/navigation/action check
  * - `.scroll()` — sets scroll restoration behavior
  * - `.focusReset()` — sets focus reset behavior
  * - `.formHandler()` — sets the form submission handler
@@ -99,8 +114,31 @@ interface BuilderState {
  * - `.redirect()` — registers a precommit redirect
  * - `.group()` — returns a scoped `RouteFactory` that
  *   inherits this builder's config
+ *
+ * @example
+ * ```ts
+ * createRouter(route => {
+ *   route('/private').guard(requireSession).render(PrivatePage)
+ * })
+ * ```
  */
 export interface RouteBuilder {
+  /**
+   * Adds an idempotent mandatory check for initial rendering (including
+   * SSR), navigations, and custom form actions. Parent checks run first;
+   * throwing or rejecting stops the chain before prefetch or content/actions.
+   * Hover prefetch does not run guards. Server calls must authorize requests
+   * independently. Checks may repeat under StrictMode or SSR/hydration.
+   *
+   * @param fn - Check that returns/resolves to allow, or throws/rejects to deny.
+   * @returns This builder, for further configuration.
+   * @example
+   * ```ts
+   * route('/private').guard(requireSession).render(PrivatePage)
+   * ```
+   */
+  guard(fn: GuardFunc): RouteBuilder
+
   /**
    * Appends middleware components to this route or group.
    * Middlewares are applied outermost-first: inherited group
@@ -213,7 +251,7 @@ export interface RouteBuilder {
   /**
    * Terminal method that creates a nested route scope.
    * Returns a `RouteFactory` whose routes inherit this
-   * builder's middleware and prefetch configuration. When
+   * builder's middleware, guard, and prefetch configuration. When
    * a path was provided, it is prepended to all child
    * route paths as a prefix.
    *
@@ -300,6 +338,23 @@ function chainPrefetches(prefetches: PrefetchFunc[]): PrefetchFunc | undefined {
 }
 
 /**
+ * Combines mandatory checks in parent-first order. A failure prevents later
+ * checks from running. Keeping the single-check case synchronous lets SSR
+ * deny access without suspending when the check itself is synchronous.
+ */
+function chainGuards(guards: GuardFunc[]): GuardFunc | undefined {
+  if (guards.length < 2) {
+    return guards[0]
+  }
+
+  return async function (context: GuardContext) {
+    for (const guard of guards) {
+      await guard(context)
+    }
+  }
+}
+
+/**
  * A no-op React component used as the `component` field for
  * redirect routes because the `Handler` interface requires a component.
  * Intercepted navigations replace this match before commit. An initial
@@ -329,6 +384,7 @@ function createRouteFactory(
 ): RouteFactory {
   return function route(path?: string): RouteBuilder {
     const state: BuilderState = {
+      guards: [],
       path,
       middlewares: [],
       prefetches: [],
@@ -407,6 +463,13 @@ function createRouteFactory(
     }
 
     const builder: RouteBuilder = {
+      guard(fn) {
+        assertNotConsumed('guard')
+        state.guards.push(fn)
+
+        return builder
+      },
+
       middleware(list) {
         assertNotConsumed('middleware')
         state.middlewares.push(...list)
@@ -449,6 +512,7 @@ function createRouteFactory(
         const fullPath = resolveFullPath()
 
         const handler: Handler = {
+          guard: chainGuards([...inherited.guards, ...state.guards]),
           component,
           middlewares: resolveMiddlewares(),
           prefetch: resolvePrefetches(),
@@ -471,6 +535,7 @@ function createRouteFactory(
         }
 
         const handler: Handler = {
+          guard: chainGuards([...inherited.guards, ...state.guards]),
           component: RedirectFallback,
           prefetch: chainPrefetches([
             ...inherited.prefetches,
@@ -493,6 +558,7 @@ function createRouteFactory(
         const childPrefix = joinPaths(inherited.prefix, state.path ?? '')
 
         const childInherited: InheritedConfig = {
+          guards: [...inherited.guards, ...state.guards],
           prefix: childPrefix,
           middlewares: [...inherited.middlewares, ...state.middlewares],
           prefetches: [...inherited.prefetches, ...state.prefetches],
@@ -540,7 +606,7 @@ function detectRedirectCycles(redirects: Map<string, string>) {
  * Routes are defined inside a callback that receives a
  * `route` factory function for chainable route configuration.
  *
- * The builder supports middleware inheritance, prefetch
+ * The builder supports mandatory guards, middleware inheritance, prefetch
  * chaining, nested groups with path prefixing, redirects,
  * and all handler options (scroll, focusReset, formHandler).
  *
@@ -585,6 +651,7 @@ export function createRouter(callback: (route: RouteFactory) => void): Matcher<H
   const redirects = new Map<string, string>()
 
   const rootInherited: InheritedConfig = {
+    guards: [],
     prefix: '',
     middlewares: [],
     prefetches: [],

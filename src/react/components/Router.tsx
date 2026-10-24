@@ -64,6 +64,12 @@ const postcommitController: NavigationPrecommitController = {
  */
 interface CurrentState {
   /**
+   * Pending initial check, retained above Suspense so retries do not restart
+   * it. Navigation matches omit this because their checks already completed.
+   */
+  initialCheck?: Promise<void>
+
+  /**
    * The resolved route match containing the handler
    * configuration and extracted URL parameters.
    */
@@ -98,6 +104,19 @@ interface CurrentState {
    * `navigation.currentEntry` during render.
    */
   url: string | null
+}
+
+/**
+ * Waits for an asynchronous initial check inside the Router's Suspense
+ * boundary, before rendering middleware or route content. Rejections reach
+ * the application's error boundary; synchronous checks run in initialization.
+ */
+function InitialGuard(props: { check?: Promise<void>; children: ReactNode }) {
+  if (props.check !== undefined) {
+    use(props.check)
+  }
+
+  return props.children
 }
 
 /**
@@ -188,17 +207,33 @@ export interface RouterProps {
  * - `PathnameContext` — the current URL pathname
  * - `ParamsContext` — the extracted route parameters
  *
+ * Mandatory route guards run before initial content, including SSR. Async
+ * initial guards show `fallback`; rejected checks reach an ancestor error
+ * boundary (or the SSR host). Checks must be idempotent because React can
+ * repeat initialization, including under StrictMode. Initial prefetch is
+ * deliberately not executed: move access checks to `.guard()` instead.
+ *
+ * @example
+ * ```tsx
+ * const matcher = createRouter(route => {
+ *   route('/private').guard(requireSession).render(PrivatePage)
+ * })
+ * <Router matcher={matcher} fallback={<p>Checking access…</p>} />
+ * ```
+ *
  * Redirect destinations are matched and prefetched before commit. Repeated
  * URLs or chains exceeding 20 redirects reject the navigation. Scroll and
  * focus options remain those of the first route: the Navigation API only
  * permits intercept options to be set during event dispatch.
  *
- * Noncancelable, interceptable events run prefetch after URL commit and
- * before the React update. Rejection fails the navigation handler without
+ * Noncancelable, interceptable events run guards then prefetch after URL
+ * commit and before the React update. Rejection fails the handler without
  * rolling back the committed URL or updating the route. Their prefetch
  * controller rejects `redirect()` and `addHandler()` with InvalidStateError.
  * Native redirects also reject during traverse/reload, even if cancelable;
  * this Router does not emulate redirects with a second navigation.
+ * A redirected custom form renders the checked destination without executing
+ * either the abandoned action or a destination action with the original body.
  * See the HTML Standard's NavigateEvent.intercept() restrictions:
  * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigateevent-intercept
  *
@@ -238,9 +273,26 @@ export function Router(props: RouterProps) {
 
   const [current, setCurrent] = useState<CurrentState>(function () {
     const url = navigation.currentEntry?.url ?? null
+    const match = next(url, notFound)
+    /**
+     * A real URL is available from browser/memory navigation. Match the
+     * existing root fallback when an implementation has no current entry.
+     */
+    const check = match.handler.guard?.({
+      params: match.params,
+      url: new URL(url ?? '/', 'http://localhost'),
+    })
+
+    /**
+     * StrictMode may discard an initializer result. Observe its rejection
+     * even in that case; the retained original promise still rejects through
+     * React's use() and reaches the error boundary, never granting access.
+     */
+    check?.catch(() => {})
 
     return {
-      match: next(url, notFound),
+      match,
+      initialCheck: check ?? undefined,
       signal: null,
       navigationType: null,
       pathname: extractPathname(url),
@@ -272,22 +324,14 @@ export function Router(props: RouterProps) {
       return
     }
 
+    /** Original URL owns a form body; redirects must never forward it. */
+    const initialUrl = event.destination.url
+    /** Original route supplies an action only while its URL is unchanged. */
+    const initialMatch = next(initialUrl, notFound)
     /** Final render match, replaced as redirects are processed in precommit. */
-    let match = next(event.destination.url, notFound)
-
-    if (event.formData !== null) {
-      if (match.handler.formHandler === undefined) {
-        return
-      }
-
-      event.intercept({
-        scroll: match.handler.scroll,
-        focusReset: match.handler.focusReset,
-        async handler() {
-          await match.handler.formHandler!(event.formData!, event)
-        },
-      })
-
+    let match = initialMatch
+    /** Native POST ownership is decided before running any route checks. */
+    if (event.formData !== null && initialMatch.handler.formHandler === undefined) {
       return
     }
 
@@ -309,10 +353,16 @@ export function Router(props: RouterProps) {
         }
 
         visited.add(url)
+        /** Shared destination snapshot for its guard and subsequent preload. */
+        const context = { params: match.params, url: new URL(url) }
+
+        if (match.handler.guard !== undefined) {
+          await match.handler.guard(context)
+        }
+
         /** True even for a redirect back to the same destination URL. */
         const hasRedirected = await runPrefetch(match.handler.prefetch, {
-          params: match.params,
-          url: new URL(url),
+          ...context,
           controller,
         })
 
@@ -324,7 +374,12 @@ export function Router(props: RouterProps) {
       throw new Error(`redirect limit exceeded: maximum ${MAX_REDIRECTS} redirects`)
     }
 
-    const handler = createHandler(function () {
+    const handler = createHandler(async function () {
+      if (event.formData !== null && event.destination.url === initialUrl) {
+        await initialMatch.handler.formHandler!(event.formData, event)
+        return
+      }
+
       setCurrent({
         match,
         signal: event.signal,
@@ -334,7 +389,10 @@ export function Router(props: RouterProps) {
       })
     })
 
-    if (!event.cancelable && match.handler.prefetch !== undefined) {
+    /** Both kinds of checks obey the same native precommit restrictions. */
+    const checks = initialMatch.handler.guard ?? initialMatch.handler.prefetch
+
+    if (!event.cancelable && checks !== undefined) {
       event.intercept({
         async handler() {
           await precommitHandler(postcommitController)
@@ -349,7 +407,7 @@ export function Router(props: RouterProps) {
 
     event.intercept({
       handler,
-      precommitHandler: match.handler.prefetch === undefined ? undefined : precommitHandler,
+      precommitHandler: checks === undefined ? undefined : precommitHandler,
       scroll: match.handler.scroll,
       focusReset: match.handler.focusReset,
     })
@@ -374,9 +432,11 @@ export function Router(props: RouterProps) {
                 <UrlContext value={current.url}>
                   <ParamsContext value={current.match.params}>
                     <Suspense fallback={props.fallback}>
-                      <Middlewares value={middlewares}>
-                        <CurrentComponent />
-                      </Middlewares>
+                      <InitialGuard check={current.initialCheck}>
+                        <Middlewares value={middlewares}>
+                          <CurrentComponent />
+                        </Middlewares>
+                      </InitialGuard>
                     </Suspense>
                   </ParamsContext>
                 </UrlContext>

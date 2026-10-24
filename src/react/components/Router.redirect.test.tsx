@@ -5,7 +5,7 @@ import { createRouter, type RouteFactory } from '../createRouter'
 import { ParamsContext } from '../context/ParamsContext'
 import { PathnameContext } from '../context/PathnameContext'
 import { Router } from './Router'
-import { type PrefetchContext } from '../router'
+import { type GuardContext, type PrefetchContext } from '../router'
 
 /** Renders destination params and pathname to expose stale route contexts. */
 function Destination() {
@@ -170,10 +170,12 @@ describe('Router redirect destinations', function () {
   }) {
     /** Neither the source guard nor the destination may run for native POST. */
     const prefetch = vi.fn()
+    /** Mandatory checks must not change ownership of a native form body. */
+    const guard = vi.fn()
     /** A redirect registration does not opt a route into form handling. */
     const app = setup((route) => {
-      route('/old').prefetch(prefetch).redirect('/target/42')
-      route('/target/:id').prefetch(prefetch).render(Destination)
+      route('/old').guard(guard).prefetch(prefetch).redirect('/target/42')
+      route('/target/:id').guard(guard).prefetch(prefetch).render(Destination)
     })
     onTestFinished(app.cleanup)
 
@@ -182,6 +184,7 @@ describe('Router redirect destinations', function () {
 
     expect(options).toEqual({})
     expect(prefetch).not.toHaveBeenCalled()
+    expect(guard).not.toHaveBeenCalled()
     expect(app.container.textContent).toBe('protected')
   })
 
@@ -201,6 +204,319 @@ describe('Router redirect destinations', function () {
     expect(options.precommitHandler).toBeUndefined()
     expect(options.handler).toBeTypeOf('function')
     expect(app.entry.url).toBe('https://example.com/target/42')
+    expect(app.container.textContent).toBe('destination:42:/target/42')
+  })
+
+  it('runs source and rematched destination guards before their own prefetch', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    /** Records mandatory checks separately from speculative preloading. */
+    const calls: string[] = []
+    const app = setup((route) => {
+      route('/old')
+        .guard(() => {
+          calls.push('source guard')
+        })
+        .prefetch(({ controller }) => {
+          calls.push('source prefetch')
+          controller.redirect('/target/42?tab=posts')
+        })
+        .render(Protected)
+      const target = route('/target')
+        .guard(async ({ url }) => {
+          expect(url.href).toBe('https://example.com/target/42?tab=posts')
+          await Promise.resolve()
+          calls.push('parent guard')
+        })
+        .group()
+      target('/:id')
+        .guard(({ params }) => {
+          expect(params).toEqual({ id: '42' })
+          calls.push('target guard')
+        })
+        .prefetch(() => {
+          calls.push('target prefetch')
+        })
+        .render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    await app.navigate('/old')
+
+    expect(calls).toEqual([
+      'source guard',
+      'source prefetch',
+      'parent guard',
+      'target guard',
+      'target prefetch',
+    ])
+    expect(app.container.textContent).toBe('destination:42:/target/42')
+  })
+
+  it('rejects a rematched group guard before destination prefetch or content', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    const prefetch = vi.fn()
+    const content = vi.fn(() => 'secret')
+    const childGuard = vi.fn()
+    const app = setup((route) => {
+      route('/old').redirect('/target/42')
+      const target = route('/target')
+        .guard(async () => {
+          throw new Error('access denied')
+        })
+        .group()
+      target('/:id').guard(childGuard).prefetch(prefetch).render(content)
+    })
+    onTestFinished(app.cleanup)
+
+    await expect(app.navigate('/old')).rejects.toThrow('access denied')
+    expect(app.entry.url).toBe('https://example.com/')
+    expect(app.container.textContent).toBe('protected')
+    expect(childGuard).not.toHaveBeenCalled()
+    expect(prefetch).not.toHaveBeenCalled()
+    expect(content).not.toHaveBeenCalled()
+  })
+
+  it('abandons custom form actions after redirect while checking and rendering the target', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    const sourceAction = vi.fn()
+    const targetAction = vi.fn()
+    const calls: string[] = []
+    const app = setup((route) => {
+      route('/submit')
+        .guard(() => {
+          calls.push('source guard')
+        })
+        .prefetch(({ controller }) => {
+          calls.push('source prefetch')
+          controller.redirect('/target/42')
+        })
+        .formHandler(sourceAction)
+        .render(Protected)
+      const target = route('/target')
+        .guard(() => {
+          calls.push('target guard')
+        })
+        .group()
+      target('/:id')
+        .prefetch(() => {
+          calls.push('target prefetch')
+        })
+        .formHandler(targetAction)
+        .middleware([Layout])
+        .render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    await app.navigate('/submit', 'push', new FormData())
+
+    expect(calls).toEqual(['source guard', 'source prefetch', 'target guard', 'target prefetch'])
+    expect(sourceAction).not.toHaveBeenCalled()
+    expect(targetAction).not.toHaveBeenCalled()
+    expect(app.container.textContent).toBe('destination:42:/target/42')
+    expect(app.container.querySelector('section[data-destination]')).not.toBeNull()
+  })
+
+  it('denies redirected form destinations without running either custom action', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    const action = vi.fn()
+    const prefetch = vi.fn()
+    const app = setup((route) => {
+      route('/submit')
+        .prefetch(({ controller }) => controller.redirect('/target/42'))
+        .formHandler(action)
+        .render(Protected)
+      route('/target/:id')
+        .guard(async () => {
+          throw new Error('access denied')
+        })
+        .prefetch(prefetch)
+        .formHandler(action)
+        .render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    await expect(app.navigate('/submit', 'push', new FormData())).rejects.toThrow('access denied')
+    expect(action).not.toHaveBeenCalled()
+    expect(prefetch).not.toHaveBeenCalled()
+    expect(app.entry.url).toBe('https://example.com/')
+    expect(app.container.textContent).toBe('protected')
+  })
+
+  it('abandons the action when a form redirects to the same route with new search params', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    const action = vi.fn()
+    const guard = vi.fn()
+    const app = setup((route) => {
+      route('/target/:id')
+        .guard(guard)
+        .prefetch(({ url, controller }) => {
+          if (!url.searchParams.has('complete')) {
+            controller.redirect('/target/42?complete=true')
+          }
+        })
+        .formHandler(action)
+        .render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    await app.navigate('/target/42', 'push', new FormData())
+
+    expect(action).not.toHaveBeenCalled()
+    expect(guard).toHaveBeenCalledTimes(2)
+    expect(app.entry.url).toBe('https://example.com/target/42?complete=true')
+    expect(app.container.textContent).toBe('destination:42:/target/42')
+  })
+
+  it('awaits a guard-only traversal after commit and before changing content', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    let allow!: () => void
+    const pending = new Promise<void>((resolve) => {
+      allow = resolve
+    })
+    const guard = vi.fn(({ params }: GuardContext) => {
+      expect(app.entry.url).toBe('https://example.com/target/42')
+      expect(params).toEqual({ id: '42' })
+      return pending
+    })
+    const app = setup((route) => route('/target/:id').guard(guard).render(Destination))
+    onTestFinished(app.cleanup)
+
+    const finished = app.navigate('/target/42', 'traverse')
+    await Promise.resolve()
+    expect(guard).toHaveBeenCalledOnce()
+    expect(app.container.textContent).toBe('protected')
+    allow()
+    const options = await finished
+
+    expect(options.precommitHandler).toBeUndefined()
+    expect(app.container.textContent).toBe('destination:42:/target/42')
+  })
+
+  it('preserves old content when a noncancelable traversal guard rejects', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    const prefetch = vi.fn()
+    const app = setup((route) => {
+      route('/target/:id')
+        .guard(async () => {
+          throw new Error('access denied')
+        })
+        .prefetch(prefetch)
+        .render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    await expect(app.navigate('/target/42', 'traverse')).rejects.toThrow('access denied')
+    expect(prefetch).not.toHaveBeenCalled()
+    expect(app.entry.url).toBe('https://example.com/target/42')
+    expect(app.container.textContent).toBe('protected')
+  })
+
+  it('runs traversal guards then async prefetch after commit before rendering', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    const calls: string[] = []
+    const app = setup((route) => {
+      route('/target/:id')
+        .guard(async () => {
+          expect(app.entry.url).toBe('https://example.com/target/42')
+          await Promise.resolve()
+          calls.push('guard')
+        })
+        .prefetch(async () => {
+          expect(app.container.textContent).toBe('protected')
+          await Promise.resolve()
+          calls.push('prefetch')
+        })
+        .render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    const options = await app.navigate('/target/42', 'traverse')
+
+    expect(options.precommitHandler).toBeUndefined()
+    expect(calls).toEqual(['guard', 'prefetch'])
+    expect(app.container.textContent).toBe('destination:42:/target/42')
+  })
+
+  it('runs noncancelable custom actions only after guards and prefetch complete', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    const calls: string[] = []
+    const formData = new FormData()
+    const app = setup((route) => {
+      route('/submit')
+        .guard(async () => {
+          expect(app.entry.url).toBe('https://example.com/submit')
+          await Promise.resolve()
+          calls.push('guard')
+        })
+        .prefetch(async () => {
+          await Promise.resolve()
+          calls.push('prefetch')
+        })
+        .formHandler((data) => {
+          expect(data).toBe(formData)
+          calls.push('action')
+        })
+        .render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    const options = await app.navigate('/submit', 'traverse', formData)
+
+    expect(options.precommitHandler).toBeUndefined()
+    expect(calls).toEqual(['guard', 'prefetch', 'action'])
+    expect(app.container.textContent).toBe('protected')
+  })
+
+  it('rejects postcommit form redirects before action execution or route update', async function ({
+    expect,
+    onTestFinished,
+  }) {
+    const action = vi.fn()
+    const guard = vi.fn()
+    const app = setup((route) => {
+      route('/submit')
+        .guard(guard)
+        .prefetch(({ controller }) => controller.redirect('/target/42'))
+        .formHandler(action)
+        .render(Protected)
+      route('/target/:id').render(Destination)
+    })
+    onTestFinished(app.cleanup)
+
+    await expect(app.navigate('/submit', 'traverse', new FormData())).rejects.toMatchObject({
+      name: 'InvalidStateError',
+    })
+    expect(guard).toHaveBeenCalledOnce()
+    expect(action).not.toHaveBeenCalled()
+    expect(app.entry.url).toBe('https://example.com/submit')
+    expect(app.container.textContent).toBe('protected')
+  })
+
+  it('keeps plain pushes free of precommit handlers', async function ({ expect, onTestFinished }) {
+    const app = setup((route) => route('/target/:id').render(Destination))
+    onTestFinished(app.cleanup)
+
+    const options = await app.navigate('/target/42')
+
+    expect(options.precommitHandler).toBeUndefined()
     expect(app.container.textContent).toBe('destination:42:/target/42')
   })
 

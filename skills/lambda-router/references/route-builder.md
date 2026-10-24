@@ -8,6 +8,7 @@
 - [Groups and Inheritance](#groups-and-inheritance)
 - [Redirects](#redirects)
 - [Prefetch Functions](#prefetch-functions)
+- [Mandatory Guards](#mandatory-guards)
 - [Form Handling](#form-handling)
 - [Handler Type](#handler-type)
 
@@ -48,6 +49,7 @@ Path patterns support:
 | ----------------------- | ---------------------------------------------------- | -------------------------------------------- |
 | `.middleware(list)`     | `(ComponentType<MiddlewareProps>[]) => RouteBuilder` | Append middleware components                 |
 | `.prefetch(fn)`         | `(PrefetchFunc) => RouteBuilder`                     | Add prefetch function to chain               |
+| `.guard(fn)`            | `(GuardFunc) => RouteBuilder`                        | Check before initial content/navigation/action |
 | `.scroll(behavior)`     | `(NavigationScrollBehavior) => RouteBuilder`         | `"after-transition"` (default) or `"manual"` |
 | `.focusReset(behavior)` | `(NavigationFocusReset) => RouteBuilder`             | `"after-transition"` (default) or `"manual"` |
 | `.formHandler(fn)`      | `(FormHandler) => RouteBuilder`                      | Handle form submissions for this route       |
@@ -69,6 +71,7 @@ Groups create scoped route factories. Child routes inherit:
 - **Path prefix**: prepended to all child paths
 - **Middleware**: prepended before child middleware (outermost first)
 - **Prefetch functions**: run before child prefetches (sequential)
+- **Guards**: run parent-first before prefetch, including on initial render
 
 ```tsx
 const router = createRouter(function (route) {
@@ -143,11 +146,55 @@ Prefetch runs during the Navigation API's precommit phase (before URL commits). 
 
 - Data preloading
 - Module preloading
-- Authentication checks with redirect
+
+Use `.guard()` for mandatory access checks, not prefetch. Prefetch does not
+run on initial render. Calling `controller.redirect()` alone does not express
+an access denial and is not equivalent to throwing or rejecting a guard.
 
 When triggered by `<Link prefetch="hover">` or `usePrefetch()` (outside a real navigation), the controller is a no-op stub.
 
 Multiple prefetch functions (from groups + route) chain sequentially.
+
+## Mandatory Guards
+
+```ts
+type GuardFunc = (context: GuardContext) => void | Promise<void>
+interface GuardContext {
+  params: Record<string, string>
+  url: URL
+}
+```
+
+```tsx
+route('/private')
+  .guard(async () => {
+    if (!(await session.isAuthenticated())) throw new Error('access denied')
+  })
+  .prefetch(loadPrivateData)
+  .formHandler(savePrivateData)
+  .render(PrivatePage)
+```
+
+Guards run before initial content (including SSR), and before prefetch during
+precommit for intercepted navigations and custom form actions. Throw/reject to
+deny access; return/resolve to permit it. Parent guards run before child guards,
+and a failure stops the chain. Guards have no redirect controller. The host
+handles initial redirects and SSR error responses. Initial client failures
+reach an ancestor error boundary; navigation failures use `onNavigateError`.
+
+Async initial checks suspend middleware and route content behind the Router's
+`fallback`. Streaming SSR waits; `renderToString` emits the fallback rather
+than waiting for async checks. Checks must be idempotent because remounts,
+StrictMode, and SSR/hydration may repeat them. Scope SSR session data to each
+request.
+
+Migration: move authentication checks out of `.prefetch()` into `.guard()`;
+leave optional data/module warming in prefetch. Guards never run for Link
+hover/viewport prefetch. Speculative prefetch can still call its data sources;
+use it only for safe requests. Legacy initial prefetch behavior is unchanged.
+
+Guards protect router UI/action dispatch, not server resources. Every server
+endpoint must authorize each request independently, including native forms.
 
 ## Form Handling
 
@@ -156,6 +203,11 @@ type FormHandler = (formData: FormData, event: NavigateEvent) => void | Promise<
 ```
 
 When a navigation includes `formData` and the matched route has a `formHandler`, it is called instead of the normal render flow.
+
+Guards and legacy prefetch are awaited before the custom action. A thrown or
+rejected check prevents the action. This adds prefetch to the custom-action
+path; previously that path skipped it. Do not use prefetch side effects that
+assume only a component navigation can invoke them.
 
 ```tsx
 route('/search')
@@ -173,6 +225,7 @@ The `Handler` interface registered in the matcher:
 ```ts
 interface Handler {
   component: ComponentType // route component to render
+  guard?: GuardFunc // mandatory initial/navigation/action check
   prefetch?: PrefetchFunc // precommit prefetch
   middlewares?: ComponentType<MiddlewareProps>[] // middleware chain
   scroll?: NavigationScrollBehavior // "after-transition" | "manual"
