@@ -143,6 +143,10 @@ export interface RouterProps {
  * ultimately falls back to `window.navigation` when neither a prop
  * nor a context value is available.
  *
+ * POST form submissions remain native browser navigations unless
+ * the destination route explicitly provides a `formHandler`.
+ * GET forms follow the normal route rendering flow.
+ *
  * Provides several contexts to descendant components:
  * - `TransitionContext` — the `[isPending, startTransition]` tuple
  * - `NavigationContext` — the Navigation object
@@ -151,6 +155,20 @@ export interface RouterProps {
  * - `NavigationSignalContext` — the current AbortSignal
  * - `PathnameContext` — the current URL pathname
  * - `ParamsContext` — the extracted route parameters
+ *
+ * @example
+ * ```tsx
+ * import { createRoot } from 'react-dom/client'
+ * import { createMatcher } from '@studiolambda/router'
+ * import { Router, type Handler } from '@studiolambda/router/react'
+ *
+ * const matcher = createMatcher<Handler>()
+ * matcher.register('/', { component: () => <form method="post" action="/server-post" /> })
+ * // The browser submits this form because /server-post has no formHandler.
+ * const container = document.createElement('div')
+ * document.body.appendChild(container)
+ * createRoot(container).render(<Router matcher={matcher} />)
+ * ```
  */
 export function Router(props: RouterProps) {
   const contextNavigation = use(NavigationContext)
@@ -193,14 +211,15 @@ export function Router(props: RouterProps) {
   const { createPrecommitHandler, createHandler } = useNavigationHandlers(transition)
 
   /**
-   * Central navigate event handler. Intercepts all same-document
-   * navigations including link clicks, form submissions,
+   * Central navigate event handler. Intercepts eligible
+   * navigations including link clicks, opted-in POST submissions,
    * back/forward buttons, and programmatic navigation.
    *
    * Skips non-interceptable navigations, hash-only changes,
    * and download requests. For form submissions with a dedicated
    * `formHandler`, delegates to that handler instead of the
-   * normal component render flow.
+   * normal component render flow. Leaves other POST submissions
+   * untouched so the browser sends their bodies to the server.
    */
   const onNavigate = useEffectEvent(function (event: NavigateEvent) {
     if (!event.canIntercept || event.hashChange || event.downloadRequest !== null) {
@@ -209,7 +228,11 @@ export function Router(props: RouterProps) {
 
     const match = next(event.destination.url, notFound)
 
-    if (event.formData !== null && match.handler.formHandler !== undefined) {
+    if (event.formData !== null) {
+      if (match.handler.formHandler === undefined) {
+        return
+      }
+
       event.intercept({
         scroll: match.handler.scroll,
         focusReset: match.handler.focusReset,
