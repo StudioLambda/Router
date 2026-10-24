@@ -15,7 +15,11 @@ import { Router } from './Router'
  * does not imply cancelability, and a forbidden precommit callback throws
  * synchronously rather than hiding the browser capability error.
  */
-function createNavigateEvent(options: { cancelable: boolean; navigationType: NavigationType }) {
+function createNavigateEvent(options: {
+  cancelable: boolean
+  navigationType: NavigationType
+  formData?: FormData
+}) {
   const event = new Event('navigate', { cancelable: options.cancelable })
   const intercept = vi.fn((interceptOptions: NavigationInterceptOptions) => {
     if (!event.cancelable && interceptOptions.precommitHandler !== undefined) {
@@ -27,7 +31,7 @@ function createNavigateEvent(options: { cancelable: boolean; navigationType: Nav
     canIntercept: true,
     hashChange: false,
     downloadRequest: null,
-    formData: null,
+    formData: options.formData ?? null,
     destination: { url: 'https://example.com/user/42?tab=profile' },
     signal: new AbortController().signal,
     navigationType: options.navigationType,
@@ -98,6 +102,29 @@ function renderHistoryRouter(prefetch: PrefetchFunc) {
 }
 
 describe('Router history navigation capabilities', () => {
+  it('leaves noncancelable POSTs to prefetched routes with the browser', ({ onTestFinished }) => {
+    const prefetch = vi.fn()
+    const view = renderHistoryRouter(prefetch)
+    onTestFinished(view.unmount)
+    const formData = new FormData()
+    formData.set('message', 'send to the server')
+    const event = createNavigateEvent({
+      cancelable: false,
+      navigationType: 'push',
+      formData,
+    })
+
+    act(() => {
+      view.navigation.dispatchEvent(event)
+    })
+
+    expect(event.intercept).not.toHaveBeenCalled()
+    expect(prefetch).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(false)
+    expect(event.formData?.get('message')).toBe('send to the server')
+    expect(view.container.textContent).toBe('Home')
+  })
+
   it('awaits noncancelable traversal prefetch after commit before updating contexts', async ({
     onTestFinished,
   }) => {

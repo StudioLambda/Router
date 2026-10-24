@@ -1,11 +1,17 @@
 # Changelog
 
+## [2.1.4] - 2026-10-24
+
+### 🐛 Bug Fixes
+
+- Preserve native POST submissions without form handlers
 ## [2.1.3] - 2026-05-10
 
 ### ⚙️ Miscellaneous Tasks
 
 - Upgrade dev dependencies and fix react externalization
 - Regenerate package-lock.json
+- *(release)* V2.1.3
 ## [2.1.2] - 2026-05-01
 
 ### ⚙️ Miscellaneous Tasks
