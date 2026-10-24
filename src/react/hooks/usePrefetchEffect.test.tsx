@@ -47,7 +47,6 @@ function renderPrefetchEffect(options: {
   document.body.appendChild(container)
 
   const root = createRoot(container)
-  let targetElement: HTMLDivElement | null = null
 
   /**
    * Test component that renders a div element with a ref
@@ -64,13 +63,7 @@ function renderPrefetchEffect(options: {
       matcher,
     })
 
-    return createElement('div', {
-      'ref': function (el: HTMLDivElement | null) {
-        ref.current = el
-        targetElement = el
-      },
-      'data-testid': 'target',
-    })
+    return <div ref={ref} data-testid="target" />
   }
 
   /**
@@ -88,7 +81,13 @@ function renderPrefetchEffect(options: {
 
   return {
     get target() {
-      return targetElement!
+      const target = container.querySelector<HTMLDivElement>('[data-testid="target"]')
+
+      if (target === null) {
+        throw new Error('prefetch target is not mounted')
+      }
+
+      return target
     },
     unmount() {
       act(function () {
