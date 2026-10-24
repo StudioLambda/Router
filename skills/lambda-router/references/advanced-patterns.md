@@ -8,8 +8,8 @@
 - [Form Submissions](#form-submissions)
 - [Dynamic Redirects](#dynamic-redirects)
 - [Nested Layouts via Middleware](#nested-layouts-via-middleware)
-- [Auth Guards with Suspense](#auth-guards-with-suspense)
-- [Cancellable Data Fetching](#cancellable-data-fetching)
+- [Mandatory Guards and SSR](#mandatory-guards-and-ssr)
+- [Navigation Signal Lifetime](#navigation-signal-lifetime)
 - [Module Federation](#module-federation)
 - [Cache Invalidation](#cache-invalidation)
 - [Custom Active Link Component](#custom-active-link-component)
@@ -57,19 +57,30 @@ The `fallback` prop is passed to the internal `<Suspense>` boundary.
 <Link href="/dashboard" prefetch="hover" once={true}>Dashboard</Link>
 ```
 
+`once` controls the DOM trigger, not the matcher-wide attempt cache. Hover
+uses a one-shot listener; viewport disconnects after the first observer
+callback, even when no entry intersects. False keeps triggers active but
+does not bypass pathname deduplication. See [Cache Invalidation](#cache-invalidation).
+
 ### Via `usePrefetch` (manual)
 
 ```tsx
 import { usePrefetch } from '@studiolambda/router/react'
 
-function SearchResults({ results }) {
+function SearchResults({ results }: { results: { id: string; title: string }[] }) {
   const prefetch = usePrefetch()
 
   return results.map((result) => (
     <a
       key={result.id}
       href={`/item/${result.id}`}
-      onMouseEnter={() => prefetch(`/item/${result.id}`)}>
+      onMouseEnter={() => {
+        try {
+          Promise.resolve(prefetch(`/item/${result.id}`)).catch(console.error)
+        } catch (error) {
+          console.error(error)
+        }
+      }}>
       {result.title}
     </a>
   ))
@@ -163,6 +174,14 @@ function ContactPage() {
 
 When a form submits to a route with a `formHandler`, the handler is called instead of the normal component render. The Navigation API intercepts the form submission natively.
 
+Guards run before prefetch, then the action. Check failure prevents dispatch.
+If precommit redirects, the target is rematched/guarded/prefetched and rendered
+without executing either action or forwarding the source body. Unchanged
+actions leave the currently rendered route in place. GET forms follow normal
+component navigation. Without an explicit original `formHandler`, POST remains
+native and Router runs neither guards nor prefetch. Authorize both custom
+action requests and native server submissions at the backend.
+
 ---
 
 ## Dynamic Redirects
@@ -180,7 +199,13 @@ const router = createRouter((route) => {
 })
 ```
 
-Redirect targets are always absolute paths. They run during the precommit phase, so the old URL never appears in the address bar.
+Use absolute path targets. Redirects run only on intercepted navigation, not
+initial rendering. Every target gets its own guards and prefetch before final
+commit. Native redirect requires a cancelable push/replace event; traverse and
+reload attempts reject. For noncancelable interceptable events, checks run
+postcommit and redirect/addHandler throw InvalidStateError. Failed checks do
+not roll back the URL or update React content. The first match retains scroll
+and focus options. Runtime loops or more than 20 redirects reject navigation.
 
 ---
 
@@ -224,64 +249,57 @@ Nesting: `AppLayout` > `SidebarLayout` > route component.
 
 ---
 
-## Auth Guards with Suspense
+## Mandatory Guards and SSR
 
-Middleware can use React 19's `use()` to suspend while checking auth:
+Use guards for access checks; middleware is only render-time composition.
+This example receives application-owned request-scoped dependencies instead
+of sharing a session promise between server requests:
 
 ```tsx
-import { type PropsWithChildren, use } from 'react'
-
-// Cache the auth promise so it's not re-created on each render
-let authPromise: Promise<Session | null> | undefined
-
-function getSession() {
-  authPromise ??= fetchSession()
-  return authPromise
+function createAccountRoutes(canRead: (path: string) => Promise<boolean>) {
+  return createRouter(route => {
+    route('/account').guard(async ({ url }) => {
+      if (!(await canRead(url.pathname))) throw new Error('access denied')
+    }).render(AccountPage)
+  })
 }
-
-function RequireAuth({ children }: PropsWithChildren) {
-  const session = use(getSession())
-  if (!session) return <Navigate to="/login" />
-  return <SessionContext value={session}>{children}</SessionContext>
-}
-
-const router = createRouter((route) => {
-  const authed = route().middleware([RequireAuth]).group()
-  authed('/dashboard').render(Dashboard)
-})
 ```
 
-The nearest `<Suspense>` boundary (the Router's `fallback`) shows while the auth check is pending.
+Guards have no redirect controller: throwing denies; returning allows.
+Router checks initial content, including SSR, without running prefetch.
+A lone synchronous guard can fail during initialization. Multiple guards
+compose asynchronously. Async initial checks suspend before middleware/content
+behind Router's fallback. Streaming SSR can await checks; renderToString emits
+fallback for pending checks instead. The host chooses HTTP errors/redirects;
+client errors need an ancestor error boundary. Navigation errors use native
+result promises and onNavigateError. Guards must be idempotent under remounts,
+StrictMode, and SSR/hydration, and never replace backend authorization.
+
+Router has no children API. Register your test page with createRouter, then
+render `<Router matcher={matcher} navigation={navigation} />`. Memory navigation
+is fixed-location: navigate/back/forward/traverseTo all return resolved promises
+for the same entry, emit no events, and never change the URL. It has no real
+history keys/state. Use an event-capable test adapter to test interception.
 
 ---
 
-## Cancellable Data Fetching
+## Navigation Signal Lifetime
 
-Use `useNavigationSignal()` to abort in-flight requests when the user navigates away:
+`useNavigationSignal()` exposes the native event signal, not a route-unmount
+signal. It is null initially and follows native cancellation semantics. A
+completed navigation's signal need not abort when a later navigation starts.
+Use an owned AbortController or your data library's cancellation mechanism
+when requests must stop on unmount. This example only inspects availability;
+it does not claim that the signal guarantees route-lifetime cancellation:
 
 ```tsx
 import { useNavigationSignal } from '@studiolambda/router/react'
 
-function DataPage() {
+function NavigationStatus() {
   const signal = useNavigationSignal()
-  const [data, setData] = useState(null)
-
-  useEffect(() => {
-    if (!signal) return
-
-    fetch('/api/data', { signal })
-      .then((res) => res.json())
-      .then(setData)
-      .catch((error) => {
-        if (error.name !== 'AbortError') throw error
-      })
-  }, [signal])
-
-  return data ? <DataView data={data} /> : <Loading />
+  return <p>{signal === null ? 'Initial render' : 'Reached by navigation'}</p>
 }
 ```
-
-The signal is aborted automatically when a new navigation starts.
 
 ---
 
@@ -300,7 +318,7 @@ const router = createRouter((route) => {
 
 // remote module
 export function registerDashboardRoutes(route: RouteFactory) {
-  const dashboard = route('/dashboard').middleware([Auth]).group()
+  const dashboard = route('/dashboard').guard(requireSession).group()
   dashboard('/').render(DashboardHome)
   dashboard('/analytics').render(Analytics)
 }
@@ -311,6 +329,18 @@ export function registerDashboardRoutes(route: RouteFactory) {
 ## Cache Invalidation
 
 After events like logout, clear the prefetch cache to force re-prefetch:
+
+The cache tracks **attempts** per pathname per matcher, not successful data.
+Queries and hashes share a key; failed callbacks remain marked; duplicate
+callers receive undefined rather than sharing the pending promise. Real
+navigation prefetch always runs and does not use this cache. Matchers shared
+by Routers share attempts. Clearing only removes bookkeeping: it does not
+invalidate your data cache, cancel work, or rearm one-shot DOM triggers.
+Expected speculative failures must be handled in the callback when using
+Link/usePrefetchEffect, which ignore returned promises. Guards are skipped
+during speculation; all speculative data sources must authorize independently.
+The speculative redirect controller does not navigate or preload targets.
+A redirect call still stops later source callbacks in a builder prefetch chain.
 
 ```tsx
 import { clearPrefetchCache } from '@studiolambda/router/react'
@@ -323,7 +353,8 @@ function LogoutButton() {
       onClick={() => {
         clearSession()
         clearPrefetchCache(router) // pass the matcher instance
-        navigate('/login')
+        const result = navigate('/login')
+        Promise.all([result.committed, result.finished]).catch(console.error)
       }}>
       Logout
     </button>

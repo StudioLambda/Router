@@ -8,12 +8,15 @@ import { type Matcher } from 'router:matcher'
  * State passed to the className function variant, allowing
  * consumers to dynamically compute class names based on the
  * link's active state.
+ * @example `<Link href="/docs" className={({ isActive }: LinkRenderProps) => isActive ? 'active' : ''}>Docs</Link>`
  */
 export interface LinkRenderProps {
   /**
    * Whether this link's href matches the current pathname.
    * True for both exact and prefix matches depending on
    * the `activeExact` prop.
+   * Query, hash, and origin do not participate in this pathname comparison.
+   * @example `<Link href="/docs" className={({ isActive }) => isActive ? 'active' : ''}>Docs</Link>`
    */
   readonly isActive: boolean
 }
@@ -22,6 +25,11 @@ export interface LinkRenderProps {
  * Props for the Link component, extending standard anchor
  * element attributes with router-specific prefetch behavior
  * and active link detection.
+ * @example
+ * ```tsx
+ * const props: LinkProps = { href: '/docs', prefetch: 'hover', activeExact: false }
+ * const link = <Link {...props}>Docs</Link>
+ * ```
  */
 export interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'className'> {
   /**
@@ -31,14 +39,19 @@ export interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>,
    * IntersectionObserver. When omitted, no proactive
    * prefetch is performed — the Navigation API handles
    * it during the click navigation.
+   * Guards do not run during speculative prefetch. Handle expected preload
+   * failures inside your callback: Link does not catch rejected prefetches.
+   * @example `<Link href="/docs" prefetch="hover">Docs</Link>`
    */
   prefetch?: PrefetchStrategy
 
   /**
    * Whether to only prefetch once. When true, hover
    * listeners use the `{ once }` option and viewport
-   * observers disconnect after the first intersection.
-   * Defaults to `true`.
+   * observers disconnect after their first callback, even if no entry is
+   * intersecting. Defaults to `true`. Setting false does not bypass the
+   * matcher-wide once-per-pathname attempt cache; see clearPrefetchCache.
+   * @example `<Link href="/docs" prefetch="hover" once={false}>Docs</Link>`
    */
   once?: boolean
 
@@ -46,6 +59,7 @@ export interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>,
    * Optional matcher override. When omitted, reads from
    * `MatcherContext`. Useful when you need to prefetch
    * against a specific set of routes.
+   * @example `<Link href="/docs" matcher={matcher} prefetch="hover">Docs</Link>`
    */
   matcher?: Matcher<Handler>
 
@@ -70,11 +84,13 @@ export interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>,
    * When true, the link is only considered active when the
    * current pathname exactly matches the href pathname.
    * When false, the link is active when the current
-   * pathname starts with the href pathname, which is useful
+   * pathname equals the href pathname or starts with it plus `/`, which is useful
    * for parent navigation items that should highlight when
    * any child route is active.
    *
    * Defaults to `true`.
+   * `/docs` matches `/docs/api`, not `/docs-old`; `/` is not a catch-all.
+   * @example `<Link href="/docs" activeExact={false}>Docs</Link>`
    */
   activeExact?: boolean
 }
@@ -95,6 +111,14 @@ export interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>,
  * component adds `data-active` and `aria-current="page"`
  * attributes. The `className` prop can be a function that
  * receives `{ isActive }` for dynamic class computation.
+ * @param props - Anchor attributes and optional active/prefetch settings.
+ * @returns An anchor; standard anchor props can override active attributes.
+ * @example
+ * ```tsx
+ * function DocsLink() {
+ *   return <Link href="/docs" prefetch="hover" activeExact={false}>Docs</Link>
+ * }
+ * ```
  */
 export function Link({
   prefetch,

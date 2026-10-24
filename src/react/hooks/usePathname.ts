@@ -3,8 +3,9 @@ import { PathnameContext } from 'router/react:context/PathnameContext'
 
 /**
  * Returns the current URL pathname from the Router's state.
- * The value updates on every navigation and reflects the
- * pathname of the committed destination URL.
+ * The value updates when navigation checks permit a rendered route update.
+ * It can lag the address bar after a failed noncancelable postcommit check;
+ * it does not subscribe directly to every native URL commit.
  *
  * Useful for active link detection, conditional rendering
  * based on the current route, or building breadcrumbs.

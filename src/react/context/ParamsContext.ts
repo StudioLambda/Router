@@ -7,6 +7,8 @@ import { createContext } from 'react'
  * a descriptive error in this case.
  *
  * The Router component updates this context on every successful
- * navigation with the newly extracted parameters.
+ * route update with the newly extracted parameters. Treat the shared record
+ * as read-only. Parameter values remain URL-encoded.
+ * @example `<ParamsContext value={{ id: '42' }}><UserPage /></ParamsContext>`
  */
 export const ParamsContext = createContext<Record<string, string> | null>(null)

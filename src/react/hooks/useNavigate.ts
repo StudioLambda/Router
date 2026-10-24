@@ -8,6 +8,10 @@ import { useNavigation } from 'router/react:hooks/useNavigation'
  *
  * @returns A navigate function that accepts a URL string and
  *   optional `NavigationNavigateOptions`.
+ *   Observe `committed` and `finished` for native navigation failures. The
+ *   memory adapter returns resolved promises without changing location.
+ * @throws Error when no NavigationContext provider is available; native
+ *   navigate errors retain the browser API's synchronous/promise semantics.
  *
  * @example
  * ```tsx
@@ -16,7 +20,8 @@ import { useNavigation } from 'router/react:hooks/useNavigation'
  *
  *   return (
  *     <button onClick={function () {
- *       navigate('/login', { history: 'replace' })
+ *       const result = navigate('/login', { history: 'replace' })
+ *       Promise.all([result.committed, result.finished]).catch(console.error)
  *     }}>
  *       Log Out
  *     </button>

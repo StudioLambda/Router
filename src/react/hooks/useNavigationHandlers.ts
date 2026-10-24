@@ -36,11 +36,15 @@ export interface PrecommitHandlerOptions {
   /**
    * Dynamic route parameters extracted from the matched
    * URL pattern.
+   * Treated as read-only; passed through without copying.
+   * @example `createPrecommitHandler({ params: { id: '42' }, url })`
    */
   readonly params: Record<string, string>
 
   /**
    * The destination URL being navigated to.
+   * Treated as read-only; passed through without copying.
+   * @example `createPrecommitHandler({ params: {}, url: new URL('https://example.com/') })`
    */
   readonly url: URL
 }
@@ -50,7 +54,7 @@ export interface PrecommitHandlerOptions {
  * `event.intercept()` method. The precommit handler runs
  * mandatory guards then prefetch before the URL commits; the handler runs
  * the React state transition after the URL commits.
- * For noncancelable events, Router instead awaits the prefetch callback
+ * For noncancelable events, Router instead awaits guards and prefetch
  * inside its post-commit handler, using a restricted controller that
  * rejects precommit-only operations.
  *
@@ -66,6 +70,9 @@ export interface PrecommitHandlerOptions {
  *   use instead of reading from TransitionContext. Pass
  *   this when calling from within the component that
  *   provides TransitionContext.
+ * @returns Factories for optional precommit checks and async transition
+ *   handlers. These primitives do not implement Router's redirect loop or
+ *   initial guards; custom adapters own those responsibilities.
  * @throws When no transition tuple is provided and the
  *   hook is used outside a TransitionContext provider.
  *
@@ -74,7 +81,14 @@ export interface PrecommitHandlerOptions {
  * function CustomRouter() {
  *   const transition = useTransition()
  *   const { createHandler } = useNavigationHandlers(transition)
- *   // use createHandler to build intercept handlers
+ *   const navigation = useNavigation()
+ *   useNavigationEvents(navigation, {
+ *     onNavigate(event) {
+ *       if (!event.canIntercept || event.formData !== null) return
+ *       event.intercept({ handler: createHandler(() => { console.log('committed') }) })
+ *     },
+ *   })
+ *   return null
  * }
  * ```
  */
@@ -95,6 +109,17 @@ export function useNavigationHandlers(transition?: ReturnType<typeof useTransiti
    * Normally runs before URL commit, without a React state transition.
    * Custom adapters may await this callback after commit for noncancelable
    * events, supplying a controller that rejects precommit-only operations.
+   * @param options - Matched params/URL and optional guard/prefetch callbacks.
+   * @returns Undefined without checks, otherwise a controller callback that
+   *   rejects on check failure. It does not rematch redirect destinations.
+   * @example
+   * ```ts
+   * const { createPrecommitHandler } = useNavigationHandlers()
+   * const check = createPrecommitHandler({
+   *   guard: requireSession, params: {}, url: new URL('https://example.com/'),
+   * })
+   * // Supply check as intercept's precommitHandler on a cancelable event.
+   * ```
    */
   function createPrecommitHandler(options: PrecommitHandlerOptions) {
     if (options.guard === undefined && options.prefetch === undefined) {
@@ -119,13 +144,20 @@ export function useNavigationHandlers(transition?: ReturnType<typeof useTransiti
   /**
    * Creates a post-commit handler that wraps the state
    * update in a React async transition for concurrent
-   * rendering. The promise resolves only after the async
-   * transition callback completes, ensuring the Navigation
-   * API waits for React to finish rendering before firing
-   * `navigatesuccess` and performing scroll restoration.
+   * rendering. The promise resolves after the callback completes, not after
+   * React necessarily commits every suspended subtree or paints. Native
+   * navigation completion waits for this promise, not an extra paint signal.
    *
    * @param callback - The transition function containing
    *   the state update to perform after the URL commits.
+   * @returns A callback returning a promise that rejects if the transition
+   *   callback throws/rejects; native intercept owns observing that promise.
+   * @example
+   * ```ts
+   * const { createHandler } = useNavigationHandlers()
+   * const handler = createHandler(() => { setPathname('/docs') })
+   * event.intercept({ handler })
+   * ```
    */
   function createHandler(callback: TransitionFunction) {
     return function handler() {

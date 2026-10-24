@@ -14,7 +14,9 @@ interface MemoryNavigationEntry {
 }
 
 /**
- * Options for creating a memory navigation instance.
+ * Fixed initial location for SSR or rendering tests. Use an absolute request
+ * URL, including query and hash; it is retained verbatim, not normalized.
+ * @example `const navigation = createMemoryNavigation({ url: 'https://example.com/user/42' })`
  */
 export interface MemoryNavigationOptions {
   /**
@@ -22,7 +24,7 @@ export interface MemoryNavigationOptions {
    * URL that `currentEntry.url` will return. Typically the
    * request URL from the server for SSR, or a test URL.
    *
-   * @example `'https://example.com/user/42?tab=posts'`
+   * @example `createMemoryNavigation({ url: 'https://example.com/user/42?tab=posts' })`
    */
   readonly url: string
 }
@@ -49,24 +51,32 @@ export interface MemoryNavigationOptions {
  *
  * The object is cast to `Navigation` for compatibility with
  * the Router's `navigation` prop and `NavigationContext`.
- * Properties not listed above are not implemented and will
- * throw if accessed by consumer code outside the Router.
+ * Properties not listed above are not implemented; reads can return
+ * undefined and calling an absent method throws. History entries only
+ * contain `url`, not real keys, IDs, state, or event methods. This is not
+ * an interactive memory router: every navigation method leaves the URL
+ * unchanged, emits no events, and returns the same resolved result.
  *
  * @param options - Configuration including the initial URL.
  * @returns A Navigation-compatible object for SSR or testing.
  *
  * @example
  * ```tsx
- * // Server-side rendering
+ * import { renderToString } from 'react-dom/server'
+ * import { createMemoryNavigation, createRouter, Router } from '@studiolambda/router/react'
+ *
+ * const matcher = createRouter(route => {
+ *   route('/user/:id').render(() => <h1>User</h1>)
+ * })
  * const navigation = createMemoryNavigation({
- *   url: request.url,
+ *   url: 'https://example.com/user/42',
  * })
  *
  * const html = renderToString(
- *   <Router navigation={navigation} matcher={matcher}>
- *     <App />
- *   </Router>
+ *   <Router navigation={navigation} matcher={matcher} />
  * )
+ * // Renders the /user/42 match; pending async guards can emit fallback.
+ * // No client navigation occurs and the entry stays at its initial URL.
  * ```
  */
 export function createMemoryNavigation(options: MemoryNavigationOptions): Navigation {

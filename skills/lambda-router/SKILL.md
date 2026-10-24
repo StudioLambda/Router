@@ -1,294 +1,151 @@
 ---
 name: lambda-router
 description: >
-  Guide for writing code that uses @studiolambda/router — a React 19 client-side
-  router built on the browser Navigation API with a trie-based URL matcher.
-  Use when writing React components, pages, layouts, or navigation logic that
-  imports from "@studiolambda/router" or "@studiolambda/router/react". Covers
-  route definitions with createRouter, the Router/Link components, all 16 hooks,
-  middleware, prefetch, lazy loading, SSR with createMemoryNavigation, search
-  params, and form handling.
+  Use for code or documentation involving @studiolambda/router or its React
+  entry point, including matcher patterns, route builders, mandatory guards,
+  middleware, hooks, speculative prefetch, redirects, form ownership, SSR,
+  memory navigation, and Navigation API lifecycle behavior. Also use when
+  maintaining this repository's exported API comments or examples.
 metadata:
-  version: '2.0.0'
+  version: '2.1.0'
 ---
 
 # Lambda Router
 
-`@studiolambda/router` is a React 19 client-side router built on the browser Navigation API. Two entry points:
+## Workflow
 
-- `@studiolambda/router` — framework-agnostic trie-based URL matcher
-- `@studiolambda/router/react` — React 19 components, hooks, and navigation
+1. Read the affected exports in `src/router/index.ts` or `src/react/index.ts`
+   and their implementations. The core entry point is a pathname matcher;
+   `/react` supplies React 19 components, hooks, and navigation integration.
+2. Read the relevant reference before producing examples:
+   - [route-builder.md](references/route-builder.md): route methods, group
+     inheritance, guards, redirects, and custom actions.
+   - [hooks-reference.md](references/hooks-reference.md): all 16 hooks,
+     provider defaults, return signatures, and native result handling.
+   - [advanced-patterns.md](references/advanced-patterns.md): speculative
+     cache, form ownership, SSR, cancellation, and integration pitfalls.
+3. Keep source comments and examples synchronized with the implementation.
+   Follow root `AGENTS.md` for mandatory same-change skill maintenance and
+   validation. Explain any checks that could not run; root `tsc --noEmit`
+   checks no files and is not a production typecheck.
 
-## How It Works
+## Start with a route table
 
-The `<Router>` component intercepts the browser Navigation API's `navigate` event, matches the destination URL against a trie of registered routes, runs prefetch logic in the precommit phase (before the URL commits to the address bar), then wraps the React state update in `startTransition` for concurrent rendering. The matched route component renders inside a `Suspense` boundary wrapped by any middleware components.
-
-Links don't need `onClick` or `preventDefault` — the Navigation API intercepts anchor clicks natively.
-
-## Quick Start
+Router renders the matched route; it has no `children` prop. Put shared UI
+in middleware so Link and router hooks see the providers. Browser usage
+requires Navigation API support; the memory adapter is not a polyfill.
 
 ```tsx
-import { lazy, Suspense } from 'react'
-import { createRouter, Router, Link } from '@studiolambda/router/react'
+import { type MiddlewareProps, createRouter, Link, Router } from '@studiolambda/router/react'
 
-const Home = lazy(() => import('./pages/Home'))
-const User = lazy(() => import('./pages/User'))
+function Layout({ children }: MiddlewareProps) {
+  return <><nav><Link href="/">Home</Link><Link href="/docs">Docs</Link></nav>{children}</>
+}
 
-const router = createRouter((route) => {
-  route('/').render(Home)
-  route('/user/:id').render(User)
+const matcher = createRouter(route => {
+  const page = route().middleware([Layout]).group()
+  page('/').render(() => <h1>Home</h1>)
+  page('/docs').render(() => <h1>Docs</h1>)
 })
 
 function App() {
-  return (
-    <Suspense fallback="Loading...">
-      <nav>
-        <Link href="/">Home</Link>
-        <Link href="/user/42">User 42</Link>
-      </nav>
-      <Router matcher={router} />
-    </Suspense>
-  )
+  return <Router matcher={matcher} fallback={<p>Loading…</p>} />
 }
 ```
 
-## Route Definition — `createRouter`
+## Separate checks, preloads, and UI
 
-Build a `Matcher<Handler>` with the declarative builder API. See [route-builder.md](references/route-builder.md) for the full chainable API.
+- Use `.guard(fn)` for mandatory, idempotent checks before initial content,
+  including SSR, and before navigation/custom-action prefetch. Return/resolve
+  to allow; throw/reject to deny. Guards receive `{ params, url }` and no
+  redirect controller. Parent guards run first. Multiple composed guards
+  are asynchronous even when individual checks are synchronous.
+- Use `.prefetch(fn)` for optional warming. It does not run on initial
+  render. Speculative Link/usePrefetch calls skip guards and use a no-op
+  controller. Preload only safe requests; protect every backend independently.
+- Use `.middleware([Layout])` for render-time composition. Middleware does
+  not guard prefetch or actions. The first wrapper is outermost.
 
 ```tsx
-const router = createRouter((route) => {
-  // Static route
-  route('/').render(Home)
-
-  // Dynamic params
-  route('/user/:id').render(User)
-
-  // Wildcard (catches remaining segments)
-  route('/files/*path').render(FileViewer)
-
-  // Redirect (static)
-  route('/old').redirect('/new')
-
-  // Redirect (dynamic with params)
-  route('/old-user/:id').redirect(({ params }) => `/user/${params.id}`)
-
-  // Route with prefetch, scroll, and form handling
-  route('/search')
-    .prefetch(({ url }) => prefetchSearchResults(url.searchParams.get('q')))
-    .scroll('manual')
-    .formHandler((formData) => handleSearchForm(formData))
-    .render(SearchPage)
-
-  // Middleware group — all children inherit Auth
-  const authed = route().middleware([Auth]).group()
-  authed('/dashboard').render(Dashboard)
-  authed('/settings').render(Settings)
-
-  // Nested groups accumulate prefix + middleware
-  const admin = authed('/admin').middleware([AdminGuard]).group()
-  admin('/users').render(AdminUsers) // path: /admin/users
-  admin('/config').render(AdminConfig) // path: /admin/config
+// Application-owned session/data functions are illustrative dependencies.
+const matcher = createRouter(route => {
+  const privateRoute = route().guard(async ({ url }) => {
+    if (!(await session.canRead(url.pathname))) throw new Error('access denied')
+  }).group()
+  privateRoute('/account').prefetch(loadAccount).render(AccountPage)
 })
 ```
 
-**Rules:**
+Guards protect UI and intercepted JavaScript dispatch, **not server
+authorization**. Native submissions and speculative reads still need backend
+authentication and authorization. Keep SSR session state request-scoped.
 
-- `.render()`, `.redirect()`, `.group()` are terminal — no further chaining after
-- Groups inherit middleware and prefetch from parents; redirects do NOT inherit middleware
-- Duplicate route registration throws
-- Static redirect cycles are detected at build time
+## Navigation lifecycle
 
-## Components
+Router skips non-interceptable events, hash-only changes, and downloads.
+For eligible cancelable events it runs guards then prefetch before commit;
+the postcommit handler updates React in a transition or executes a custom
+action. Noncancelable, interceptable events (notably history traversal) run
+checks after URL commit. A rejected check prevents the UI/action update but
+cannot roll the URL back. The restricted postcommit controller throws
+`InvalidStateError` for both `redirect()` and `addHandler()`.
 
-### `<Router>`
+Native redirects require a cancelable push/replace, not traverse/reload.
+Successful precommit redirects rematch destination params/URL, run its guards
+then its prefetch, and stop the abandoned prefetch chain. Repeated full URLs
+or more than 20 redirects fail. Scroll/focus options stay those of the first
+match because intercept options are set during event dispatch. Redirect
+routes do not redirect initial loads; the host handles initial/SSR redirects.
 
-Top-level orchestrator. Provides contexts consumed by all hooks.
+POST bodies belong to the original destination. Without an explicit
+`formHandler`, Router leaves POST native and runs neither guards nor prefetch.
+Custom actions await both checks. If precommit redirects, Router renders the
+checked destination without executing either action or forwarding the body.
+GET forms use normal component navigation. See the form/reference details
+before writing submission examples.
 
-```tsx
-<Router
-  matcher={router} // Matcher<Handler> (required in practice)
-  navigation={memoryNav} // Navigation override (SSR/testing)
-  notFound={Custom404} // custom 404 component
-  fallback={<Spinner />} // Suspense fallback
-  transition={[isPending, startTransition]} // share transition with parent
-  onNavigateSuccess={() => analytics.pageView()}
-  onNavigateError={(error) => reportError(error)}
-/>
-```
-
-Falls back to `window.navigation` when no `navigation` prop or context is provided.
-
-### `<Link>`
-
-Anchor element with prefetch and active link detection.
-
-```tsx
-<Link href="/about">About</Link>
-
-// Prefetch on hover
-<Link href="/about" prefetch="hover">About</Link>
-
-// Prefetch when scrolled into viewport
-<Link href="/about" prefetch="viewport">About</Link>
-
-// Dynamic className based on active state
-<Link
-  href="/about"
-  className={({ isActive }) => isActive ? "nav-active" : "nav-link"}
->About</Link>
-
-// Prefix matching (active for /docs and /docs/*)
-<Link href="/docs" activeExact={false}>Docs</Link>
-```
-
-Active links get `data-active` and `aria-current="page"` attributes automatically.
-
-## Hooks
-
-All hooks must be used inside a `<Router>` tree. They throw descriptive errors outside their provider. See [hooks-reference.md](references/hooks-reference.md) for complete API.
-
-| Hook                             | Returns                               | Purpose                                    |
-| -------------------------------- | ------------------------------------- | ------------------------------------------ |
-| `useParams()`                    | `Record<string, string>`              | Dynamic route params (`:id` segments)      |
-| `usePathname()`                  | `string`                              | Current URL pathname                       |
-| `useSearchParams()`              | `[URLSearchParams, setter]`           | Search params + setter (preserves hash)    |
-| `useNavigate()`                  | `(url, options?) => NavigationResult` | Programmatic navigation                    |
-| `useNavigation()`                | `Navigation`                          | Raw Navigation API object                  |
-| `useNavigationType()`            | `NavigationType \| null`              | `push`/`replace`/`reload`/`traverse`       |
-| `useNavigationSignal()`          | `AbortSignal \| null`                 | Current navigation's abort signal          |
-| `useIsPending()`                 | `boolean`                             | Whether a transition is in progress        |
-| `useBack()`                      | `{ back, canGoBack }`                 | Back navigation + reactive availability    |
-| `useForward()`                   | `{ forward, canGoForward }`           | Forward navigation + reactive availability |
-| `usePrefetch()`                  | `(url) => void`                       | Trigger route prefetch manually            |
-| `usePrefetchEffect(ref, opts)`   | `void`                                | Attach prefetch to DOM element             |
-| `useActiveLinkProps(href, opts)` | `{ isActive, props }`                 | Active link detection                      |
-
-### Common Hook Patterns
+## Initial rendering and SSR
 
 ```tsx
-// Read route params
-function UserPage() {
-  const { id } = useParams()
-  return <div>User {id}</div>
-}
+import { renderToString } from 'react-dom/server'
+import { createMemoryNavigation, createRouter, Router } from '@studiolambda/router/react'
 
-// Programmatic navigation
-function LogoutButton() {
-  const navigate = useNavigate()
-  return (
-    <button
-      onClick={() => {
-        navigate('/login')
-      }}>
-      Logout
-    </button>
-  )
-}
-
-// Search params
-function SearchPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const query = searchParams.get('q') ?? ''
-  return <input value={query} onChange={(e) => setSearchParams({ q: e.target.value })} />
-}
-
-// Pending indicator
-function Layout({ children }: { children: React.ReactNode }) {
-  const isPending = useIsPending()
-  return (
-    <div>
-      {isPending && <ProgressBar />}
-      {children}
-    </div>
-  )
-}
-```
-
-## Middleware
-
-Middleware components receive `{ children }` and wrap the route component. They can suspend, conditionally render, or add context.
-
-```tsx
-import { type PropsWithChildren, use } from 'react'
-
-// Auth guard using Suspense
-function Auth({ children }: PropsWithChildren) {
-  const session = use(fetchSession()) // suspends until resolved
-  if (!session) return <LoginPage />
-  return <SessionContext value={session}>{children}</SessionContext>
-}
-
-// Layout wrapper
-function DashboardLayout({ children }: PropsWithChildren) {
-  return (
-    <div className="dashboard">
-      <Sidebar />
-      <main>{children}</main>
-    </div>
-  )
-}
-
-// Apply to routes
-const router = createRouter((route) => {
-  const authed = route().middleware([Auth, DashboardLayout]).group()
-  authed('/dashboard').render(Dashboard)
+const matcher = createRouter(route => {
+  route('/docs').guard(() => {}).render(() => <h1>Docs</h1>)
 })
+const navigation = createMemoryNavigation({ url: 'https://example.com/docs' })
+const html = renderToString(<Router matcher={matcher} navigation={navigation} />)
 ```
 
-Middlewares nest outermost-first: `[Auth, Layout]` means Auth wraps Layout wraps RouteComponent.
+A single synchronous guard can throw during initialization. Asynchronous
+initial checks suspend before middleware/content; rejected promises reach an
+ancestor client error boundary or the SSR host. Streaming SSR can await them;
+`renderToString` emits the Suspense fallback for pending checks. The host
+chooses HTTP statuses and initial redirects. Checks may repeat on remount,
+StrictMode, and SSR/hydration. Navigation failures use native result promises
+and `onNavigateError`, not the initial-render error path.
 
-## SSR and Testing
+`createMemoryNavigation` holds one fixed entry. Its navigation/traversal
+methods return already-resolved promises without changing the URL or firing
+events, even when `canGoBack`/`canGoForward` are false. Other native members
+can be absent. Use a purpose-built event adapter for interactive tests.
 
-Use `createMemoryNavigation` for non-browser environments:
-
-```tsx
-import { createMemoryNavigation, Router } from '@studiolambda/router/react'
-
-// SSR
-const navigation = createMemoryNavigation({ url: 'https://example.com/page' })
-function ServerApp() {
-  return <Router matcher={router} navigation={navigation} />
-}
-
-// Testing helper
-function renderWithRouter(ui: React.ReactNode, { url = '/' } = {}) {
-  const nav = createMemoryNavigation({ url: `http://localhost${url}` })
-  return render(
-    <Router matcher={router} navigation={nav}>
-      {ui}
-    </Router>
-  )
-}
-```
-
-`createMemoryNavigation` provides a stub Navigation with no-op event methods, single-entry history, and pre-resolved navigation promises. `back()`/`forward()`/`traverseTo()` throw "not supported" errors.
-
-## URL Pattern Matching (standalone)
-
-The core matcher can be used independently of React:
+## Core matcher
 
 ```ts
 import { createMatcher } from '@studiolambda/router'
 
 const matcher = createMatcher<string>()
-matcher.register('/users', 'list')
-matcher.register('/users/:id', 'detail')
-matcher.register('/files/*path', 'files')
-
-matcher.match('/users') // { handler: "list", params: {} }
-matcher.match('/users/42') // { handler: "detail", params: { id: "42" } }
-matcher.match('/files/a/b/c') // { handler: "files", params: { path: "a/b/c" } }
-matcher.match('/unknown') // null
+matcher.register('/users/:id', 'user')
+matcher.register('/files/*path', 'file')
+const id = matcher.match('/users/42')?.params.id // '42'
+const missing = matcher.match('/missing') // null
 ```
 
-- Matching priority: static > dynamic (`:param`) > wildcard (`*param`)
-- Trailing slashes are ignored
-- Conflicting param names at the same trie level throw
-- Bare `*` captures into param named `"*"`
-
-## When to Load References
-
-- Defining routes with full builder options -> [route-builder.md](references/route-builder.md)
-- Using hooks (detailed API, all options, edge cases) -> [hooks-reference.md](references/hooks-reference.md)
-- Advanced patterns (prefetch, forms, redirects, cache) -> [advanced-patterns.md](references/advanced-patterns.md)
+Pass a pathname, not a full URL/query. Static segments beat dynamic segments,
+which beat wildcards, with fallback search. Empty segments are ignored;
+captures remain URL-encoded. A wildcard needs at least one segment and must
+be placed last for matching to resolve it (registration does not validate
+terminal placement). Bare `*` uses the key `'*'`. Duplicate registrations
+and conflicting parameter names throw. Use defined handlers; undefined means
+no registration. An injected root is retained and mutated, not copied.

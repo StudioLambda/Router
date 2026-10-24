@@ -3,13 +3,14 @@ import { NavigationSignalContext } from 'router/react:context/NavigationSignalCo
 
 /**
  * Returns the AbortSignal from the current navigation event.
- * The signal aborts when the navigation is cancelled (e.g.,
- * by the user pressing Stop or a new navigation superseding
- * this one). Pass this to fetch calls or other cancellable
- * async operations to avoid stale work.
+ * Cancellation follows the native NavigateEvent lifetime. It is not a
+ * route-unmount signal: a completed navigation's signal need not abort on
+ * the next navigation. Use a separately owned AbortController for work that
+ * must stop on unmount; Router adds no stronger cancellation guarantee.
  *
- * Returns `null` before any navigation event has occurred
- * (i.e. on the initial render).
+ * Returns `null` on initial render, until an intercepted navigation updates
+ * the rendered match. Failed checks and unchanged custom form actions do
+ * not replace the signal stored with that match.
  *
  * Must be used inside a `<Router>` component tree.
  *
@@ -19,12 +20,9 @@ import { NavigationSignalContext } from 'router/react:context/NavigationSignalCo
  *
  * @example
  * ```tsx
- * function UserProfile({ id }: { id: string }) {
+ * function NavigationStatus() {
  *   const signal = useNavigationSignal()
- *
- *   useEffect(function () {
- *     fetch(`/api/user/${id}`, { signal })
- *   }, [id, signal])
+ *   return <p>{signal === null ? 'Initial render' : 'Reached by navigation'}</p>
  * }
  * ```
  */

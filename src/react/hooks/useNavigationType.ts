@@ -2,13 +2,14 @@ import { use } from 'react'
 import { NavigationTypeContext } from 'router/react:context/NavigationTypeContext'
 
 /**
- * Returns the navigation type of the most recent navigation
+ * Returns the navigation type associated with the rendered route
  * (`push`, `replace`, `reload`, or `traverse`). Useful for
- * varying animations, skipping prefetch on reload, or
+ * varying rendered animations or
  * applying different behavior for back/forward traversals.
  *
- * Returns `null` before any navigation event has occurred
- * (i.e. on the initial render).
+ * Returns `null` initially, until an intercepted navigation updates the
+ * rendered match. Failed checks and unchanged custom form actions do not
+ * replace the stored type.
  *
  * Must be used inside a `<Router>` component tree.
  *

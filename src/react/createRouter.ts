@@ -115,6 +115,10 @@ interface BuilderState {
  * - `.group()` — returns a scoped `RouteFactory` that
  *   inherits this builder's config
  *
+ * Every method throws if a terminal method has consumed the builder.
+ * Scroll, focus, and form handlers apply only to rendered routes; groups
+ * inherit guards, prefetches, and middleware, not these route-local options.
+ *
  * @example
  * ```ts
  * createRouter(route => {
@@ -147,6 +151,8 @@ export interface RouteBuilder {
    *
    * @param list - Middleware components to append.
    * @returns The builder for further chaining.
+   * Middleware is render-time composition, not a prefetch/action guard.
+   * @example `route('/docs').middleware([DocsLayout]).render(DocsPage)`
    */
   middleware(list: ComponentType<MiddlewareProps>[]): RouteBuilder
 
@@ -162,9 +168,9 @@ export interface RouteBuilder {
    * @returns The builder for further chaining.
    *
    * @example
-   * route('/private').prefetch(({ controller }) => {
-   *   controller.redirect('/login')
-   * }).render(PrivatePage)
+   * route('/user/:id').prefetch(async ({ params }) => {
+   *   await loadUser(params.id)
+   * }).render(UserPage)
    */
   prefetch(fn: PrefetchFunc): RouteBuilder
 
@@ -173,10 +179,12 @@ export interface RouteBuilder {
    * - `'after-transition'` — browser handles scroll after
    *   the handler promise resolves (default).
    * - `'manual'` — disables automatic scrolling so the
-   *   route component can call `event.scroll()` manually.
+   *   application can manage scrolling itself. Router does not expose the
+   *   NavigateEvent to route components.
    *
    * @param behavior - The scroll behavior to use.
    * @returns The builder for further chaining.
+   * @example `route('/feed').scroll('manual').render(FeedPage)`
    */
   scroll(behavior: NavigationScrollBehavior): RouteBuilder
 
@@ -188,6 +196,7 @@ export interface RouteBuilder {
    *
    * @param behavior - The focus reset behavior to use.
    * @returns The builder for further chaining.
+   * @example `route('/editor').focusReset('manual').render(EditorPage)`
    */
   focusReset(behavior: NavigationFocusReset): RouteBuilder
 
@@ -195,10 +204,19 @@ export interface RouteBuilder {
    * Sets the form submission handler for this route. When
    * a navigation includes FormData and matches this route,
    * the form handler is called instead of rendering the
-   * component.
+   * component. Guards and prefetch finish first. Without a form handler,
+   * POST submissions remain native and run neither check. A precommit
+   * redirect renders the checked target without forwarding the body to
+   * either action. GET forms follow the normal component navigation flow.
    *
    * @param fn - The form handler function.
    * @returns The builder for further chaining.
+   * @example
+   * ```ts
+   * route('/contact').formHandler(async (data) => {
+   *   await saveContact(data)
+   * }).render(ContactPage)
+   * ```
    */
   formHandler(fn: FormHandler): RouteBuilder
 
@@ -210,7 +228,9 @@ export interface RouteBuilder {
    *
    * @param component - The React component to render.
    * @throws When no path was provided to the `route()` call
-   *   and no group prefix exists.
+   *   and no group prefix exists, the builder was consumed, or registration
+   *   duplicates a route or conflicts with existing parameter names.
+   * @example `route('/').render(HomePage)`
    */
   render(component: ComponentType): void
 
@@ -220,8 +240,10 @@ export interface RouteBuilder {
    * precommit handler calls `controller.redirect(target)`
    * before the URL commits, avoiding any component render
    * or visual flash.
-   * Inherited and local prefetch guards run first and can override the
-   * redirect. Router resolves and prefetches every destination before commit.
+   * Inherited and local mandatory guards run first, then prefetch callbacks
+   * can override the redirect. Router rematches every destination and runs
+   * its guards before its prefetch. Only cancelable push/replace events
+   * support native redirects; unsupported attempts reject navigation.
    * This applies to navigate events, not the initial render of the page.
    *
    * The target can be a static absolute path string, or a
@@ -235,7 +257,8 @@ export interface RouteBuilder {
    * @param target - The redirect target: a static path or a
    *   callback receiving `PrefetchContext` and returning one.
    * @throws When no path was provided to the `route()` call
-   *   and no group prefix exists.
+   *   and no group prefix exists, the builder was consumed, or registration
+   *   duplicates a route or conflicts with existing parameter names.
    *
    * @example
    * ```ts
@@ -271,13 +294,20 @@ export interface RouteBuilder {
 /**
  * Factory function that creates a route builder for a given
  * path. When path is omitted, the builder is used purely for
- * group-level configuration (middleware, prefetch) without
+ * group-level configuration (guards, middleware, prefetch) without
  * contributing a path segment.
  *
  * @param path - Optional path pattern for this route. May
  *   contain dynamic (`:param`) and wildcard (`*param`)
  *   segments.
  * @returns A chainable route builder.
+ * @example
+ * ```ts
+ * const registerUsers = (route: RouteFactory) => {
+ *   route('/users/:id').render(UserPage)
+ * }
+ * const matcher = createRouter(registerUsers)
+ * ```
  */
 export type RouteFactory = (path?: string) => RouteBuilder
 
@@ -315,7 +345,7 @@ function joinPaths(prefix: string, path: string): string {
  * Combines an array of prefetch functions into a single
  * `PrefetchFunc` that calls each one sequentially until one redirects.
  * Later callbacks belong to the abandoned route and must not run after a
- * guard redirects. Returns `undefined` when the array is empty.
+ * prefetch redirects. Returns `undefined` when the array is empty.
  *
  * @param prefetches - The prefetch functions to chain.
  * @returns A single combined prefetch function, or undefined.
@@ -329,7 +359,10 @@ function chainPrefetches(prefetches: PrefetchFunc[]): PrefetchFunc | undefined {
     return prefetches[0]
   }
 
-  /** Runs guards in registration order, abandoning the chain on redirect. */
+  /**
+   * Runs prefetches in registration order, stopping after a redirect so later
+   * callbacks cannot load data for an abandoned route. Failures propagate.
+   */
   return async function (context: PrefetchContext) {
     for (const fn of prefetches) {
       if (await runPrefetch(fn, context)) return
@@ -341,6 +374,9 @@ function chainPrefetches(prefetches: PrefetchFunc[]): PrefetchFunc | undefined {
  * Combines mandatory checks in parent-first order. A failure prevents later
  * checks from running. Keeping the single-check case synchronous lets SSR
  * deny access without suspending when the check itself is synchronous.
+ * @param guards - Parent-first checks; the array is retained by the chain.
+ * @returns Undefined for none, the original callback for one, or an async
+ *   sequential callback for multiple checks. Failures reject the chain.
  */
 function chainGuards(guards: GuardFunc[]): GuardFunc | undefined {
   if (guards.length < 2) {
@@ -620,7 +656,9 @@ function detectRedirectCycles(redirects: Map<string, string>) {
  * @param callback - A function that defines routes using the
  *   provided `route` factory.
  * @returns A populated matcher ready for the Router.
- * @throws When a static redirect cycle is detected.
+ * @throws When a static redirect cycle, duplicate pattern, conflicting
+ *   parameter name, missing route path, or consumed builder is encountered.
+ *   Exceptions from the definition callback also propagate to the caller.
  *
  * @example
  * ```tsx
@@ -633,12 +671,12 @@ function detectRedirectCycles(redirects: Map<string, string>) {
  *     .scroll('after-transition')
  *     .render(Other)
  *
- *   const authed = route().middleware([Auth]).group()
+ *   const authed = route().guard(requireSession).middleware([AppLayout]).group()
  *   authed('/dashboard').render(Dashboard)
  *   authed('/user/:id').render(User)
  *
  *   const admin = authed('/admin')
- *     .middleware([AdminOnly])
+ *     .guard(requireAdmin)
  *     .group()
  *   admin('/settings').render(Settings)
  * })

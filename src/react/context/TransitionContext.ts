@@ -11,5 +11,16 @@ import { createContext, useTransition } from 'react'
  * Using the standalone `startTransition` from React as a default
  * would silently break `isPending` tracking, so we require an
  * explicit provider instead.
+ * @example
+ * ```tsx
+ * function App() {
+ *   const transition = useTransition()
+ *   return (
+ *     <TransitionContext value={transition}>
+ *       <Router matcher={matcher} transition={transition} />
+ *     </TransitionContext>
+ *   )
+ * }
+ * ```
  */
 export const TransitionContext = createContext<ReturnType<typeof useTransition> | null>(null)

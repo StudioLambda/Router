@@ -9,5 +9,10 @@ import { createContext } from 'react'
  *
  * The `useNavigation` hook throws a descriptive error when consumed
  * without a provider.
+ * @example
+ * ```tsx
+ * const navigation = createMemoryNavigation({ url: 'https://example.com/' })
+ * const app = <NavigationContext value={navigation}><Router matcher={matcher} /></NavigationContext>
+ * ```
  */
 export const NavigationContext = createContext<Navigation | null>(null)
