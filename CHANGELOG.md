@@ -1,11 +1,20 @@
 # Changelog
 
+## [3.0.1] - 2026-10-24
+
+### 📚 Documentation
+
+- Document public APIs and maintain agent skills
 ## [3.0.0] - 2026-10-24
 
 ### 🐛 Bug Fixes
 
 - [**breaking**] Gate initial routes and custom actions with mandatory checks
 - Reconcile route guards with integrated navigation fixes
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V3.0.0
 ## [2.1.6] - 2026-10-24
 
 ### 🐛 Bug Fixes
