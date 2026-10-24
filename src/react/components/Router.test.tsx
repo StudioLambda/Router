@@ -540,11 +540,179 @@ describe('Router', { concurrent: true }, function () {
         }),
       }
 
-      navigation.dispatchEvent(Object.assign(new Event('navigate'), event))
+      navigation.dispatchEvent(Object.assign(new Event('navigate', { cancelable: true }), event))
 
       expect(event.intercept).toHaveBeenCalled()
       expect(typeof interceptOptions.precommitHandler).toBe('function')
     })
+  })
+
+  it('leaves POST submissions native when the matched route has no formHandler', function ({
+    expect,
+    onTestFinished,
+  }) {
+    /**
+     * Matches the POST destination without opting into form handling.
+     * A matching component alone must not claim ownership of POST data.
+     */
+    const matcher = createMatcher<Handler>()
+    /**
+     * Detects destination rendering for a server-owned POST.
+     * It must remain untouched while native submission proceeds.
+     */
+    const component = vi.fn(() => createElement('div', null, 'Destination'))
+    /**
+     * Detects prefetch work independently of destination rendering.
+     * Native submissions must not start the SPA precommit flow.
+     */
+    const prefetch = vi.fn()
+
+    matcher.register('/server-post', { component, prefetch })
+
+    /**
+     * Starts on the unmatched home URL so destination rendering is observable.
+     * Cleanup removes the mounted Router after all assertions.
+     */
+    const { container, navigation, unmount } = renderRouter({ matcher })
+
+    onTestFinished(unmount)
+
+    /**
+     * Represents a nonempty POST body owned by the browser.
+     * A client route without a form action must leave its values intact.
+     */
+    const formData = new FormData()
+    formData.set('message', 'keep this body')
+
+    /**
+     * Models an interceptable POST with a cancelable navigation event.
+     * Either interception or cancellation would suppress native submission.
+     */
+    const event = Object.assign(new Event('navigate', { cancelable: true }), {
+      canIntercept: true,
+      hashChange: false,
+      downloadRequest: null,
+      formData,
+      destination: { url: 'https://example.com/server-post' },
+      intercept: vi.fn(),
+    })
+
+    act(() => {
+      navigation.dispatchEvent(event)
+    })
+
+    expect(event.intercept).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(false)
+    expect(prefetch).not.toHaveBeenCalled()
+    expect(component).not.toHaveBeenCalled()
+    expect(container.textContent).toBe('Not Found')
+  })
+
+  it('leaves POST submissions native when no route matches', function ({ expect, onTestFinished }) {
+    /**
+     * Contains only the source page, not the server-owned POST endpoint.
+     * The fallback match must not turn an unknown POST into SPA navigation.
+     */
+    const matcher = createMatcher<Handler>()
+    /**
+     * Identifies the source page while native submission proceeds.
+     * Rendering Not Found instead would replace this text.
+     */
+    function Home() {
+      return createElement('div', null, 'Home')
+    }
+
+    matcher.register('/', { component: Home })
+
+    /**
+     * Keeps the initial route visible until the browser performs submission.
+     * Cleanup unmounts the listener along with the source page.
+     */
+    const { container, navigation, unmount } = renderRouter({ matcher })
+
+    onTestFinished(unmount)
+
+    /**
+     * Carries submitted data outside the SPA route table.
+     * A missing route must not cause this body to be discarded.
+     */
+    const formData = new FormData()
+    formData.set('message', 'keep this body')
+
+    /**
+     * Allows native submission unless the router intercepts or cancels it.
+     * The unknown destination deliberately resolves to the fallback route.
+     */
+    const event = Object.assign(new Event('navigate', { cancelable: true }), {
+      canIntercept: true,
+      hashChange: false,
+      downloadRequest: null,
+      formData,
+      destination: { url: 'https://example.com/server-post' },
+      intercept: vi.fn(),
+    })
+
+    act(() => {
+      navigation.dispatchEvent(event)
+    })
+
+    expect(event.intercept).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(false)
+    expect(container.textContent).toBe('Home')
+  })
+
+  it('leaves an empty POST body native without a formHandler', function ({
+    expect,
+    onTestFinished,
+  }) {
+    /**
+     * Registers the destination without a client-side form action.
+     * Empty POST bodies must use the same opt-in rule as nonempty bodies.
+     */
+    const matcher = createMatcher<Handler>()
+    /**
+     * Detects accidental rendering when the POST body has no entries.
+     * This component is never mounted for the source URL.
+     */
+    const component = vi.fn(() => createElement('div', null, 'Destination'))
+    /**
+     * Detects precommit work for the empty POST destination.
+     * No client prefetch should run before native submission.
+     */
+    const prefetch = vi.fn()
+
+    matcher.register('/server-post', { component, prefetch })
+
+    /**
+     * Starts outside the destination route to detect unintended state updates.
+     * Cleanup prevents navigation listeners from leaking into other tests.
+     */
+    const { container, navigation, unmount } = renderRouter({ matcher })
+
+    onTestFinished(unmount)
+
+    /**
+     * Empty FormData still denotes POST, unlike the null value used by GET.
+     * No field is added so checking the entry count would fail this test.
+     */
+    const event = Object.assign(new Event('navigate', { cancelable: true }), {
+      canIntercept: true,
+      hashChange: false,
+      downloadRequest: null,
+      formData: new FormData(),
+      destination: { url: 'https://example.com/server-post' },
+      intercept: vi.fn(),
+    })
+
+    act(() => {
+      navigation.dispatchEvent(event)
+    })
+
+    expect(event.intercept).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(false)
+    expect(prefetch).not.toHaveBeenCalled()
+    expect(component).not.toHaveBeenCalled()
+    expect(container.textContent).toBe('Not Found')
   })
 
   it('handles form submissions with a dedicated formHandler', function ({

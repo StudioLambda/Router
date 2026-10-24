@@ -33,12 +33,19 @@ export interface Handler {
 
   /**
    * Optional preload invoked after guards during navigation/action
-   * precommit, or speculatively without guards by Link/usePrefetch.
+   * checks, or speculatively without guards by Link/usePrefetch.
    * Not invoked on initial rendering; use `guard` for mandatory checks.
+   * Runs before URL commit for cancelable navigations, but after commit
+   * for noncancelable, interceptable events such as history traversal.
+   * Rejection prevents the route update; an already committed URL remains.
+   * See {@link PrefetchContext.controller} for redirect limitations.
    *
    * @example
    * ```ts
-   * const handler: Handler = { component: Page, prefetch: loadPageData }
+   * matcher.register('/user/:id', {
+   *   component: UserPage,
+   *   prefetch: async ({ params }) => { await loadUser(params.id) },
+   * })
    * ```
    */
   readonly prefetch?: PrefetchFunc
@@ -137,10 +144,17 @@ export interface GuardContext {
 export type GuardFunc = (context: GuardContext) => void | Promise<void>
 
 /**
- * Context passed to prefetch functions during the precommit
- * phase of a navigation. Provides the matched route parameters,
- * the destination URL, and the Navigation API's precommit
- * controller for redirects.
+ * Context passed to prefetch functions before the rendered route updates.
+ * Noncancelable navigations run prefetch after URL commit; their controller
+ * rejects precommit-only operations instead of emulating a redirect.
+ * Hover prefetch is speculative and uses a no-op controller instead.
+ *
+ * @example
+ * ```ts
+ * const prefetch = async ({ params, url }: PrefetchContext) => {
+ *   await loadUser(params.id, url.searchParams.get('tab'))
+ * }
+ * ```
  */
 export interface PrefetchContext {
   /**
@@ -160,25 +174,44 @@ export interface PrefetchContext {
 
   /**
    * The precommit controller from the Navigation API,
-   * providing `redirect()` to abort the current navigation
-   * and redirect elsewhere, and `addHandler()` to register
+   * providing `redirect()` to retarget a push/replace navigation
+   * before commit, and `addHandler()` to register
    * additional post-commit handlers. When prefetch is
    * triggered outside a real navigation (e.g. Link hover),
-   * this is a stub with no-op methods.
+   * this is a stub with no-op methods. For noncancelable navigations,
+   * prefetch runs after commit and both methods throw InvalidStateError.
+   * Native `redirect()` only supports push/replace, not traverse/reload
+   * even when cancelable. No follow-up navigation is synthesized.
+   * Successful precommit redirects run the destination's own prefetch
+   * before commit and stop subsequent callbacks in the abandoned chain.
+   *
+   * @example
+   * ```ts
+   * // Only during a cancelable push/replace navigation:
+   * const prefetch: PrefetchFunc = ({ controller }) => {
+   *   controller.redirect('/login')
+   * }
+   * ```
    */
   readonly controller: NavigationPrecommitController
 }
 
 /**
- * Function invoked during the precommit phase of a navigation.
- * Receives a context object with the matched route parameters,
- * destination URL, and the Navigation API's precommit controller
- * for redirects or additional handler registration.
+ * Function awaited before updating the rendered route. It runs before
+ * commit when cancelable, otherwise after commit. Receives matched params
+ * and destination URL; controller capabilities depend on the phase and
+ * navigation type (see {@link PrefetchContext.controller}).
  *
  * @param context - The prefetch context containing route params,
  *   destination URL, and the precommit controller.
  * @returns Void or a promise that resolves when prefetching
  *   is complete.
+ * @example
+ * ```ts
+ * const prefetch: PrefetchFunc = async ({ params }) => {
+ *   await loadUser(params.id)
+ * }
+ * ```
  */
 export type PrefetchFunc = {
   (context: PrefetchContext): void | Promise<void>

@@ -1,11 +1,30 @@
 # Changelog
 
+## [2.1.5] - 2026-10-24
+
+### 🐛 Bug Fixes
+
+- Prefetch noncancelable navigations after commit
+
+### ⚙️ Miscellaneous Tasks
+
+- Merge main and verify POST navigation ownership
+## [2.1.4] - 2026-10-24
+
+### 🐛 Bug Fixes
+
+- Preserve native POST submissions without form handlers
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V2.1.4
 ## [2.1.3] - 2026-05-10
 
 ### ⚙️ Miscellaneous Tasks
 
 - Upgrade dev dependencies and fix react externalization
 - Regenerate package-lock.json
+- *(release)* V2.1.3
 ## [2.1.2] - 2026-05-01
 
 ### ⚙️ Miscellaneous Tasks

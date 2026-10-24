@@ -60,7 +60,7 @@ function navigationAttempt(options: { url: string; formData: FormData | null }) 
     navigation,
     async run() {
       let interception: NavigationInterceptOptions | undefined
-      const event = Object.assign(new Event('navigate'), {
+      const event = Object.assign(new Event('navigate', { cancelable: true }), {
         canIntercept: true,
         hashChange: false,
         downloadRequest: null,

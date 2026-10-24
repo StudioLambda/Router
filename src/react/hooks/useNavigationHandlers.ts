@@ -50,6 +50,9 @@ export interface PrecommitHandlerOptions {
  * `event.intercept()` method. The precommit handler runs
  * mandatory guards then prefetch before the URL commits; the handler runs
  * the React state transition after the URL commits.
+ * For noncancelable events, Router instead awaits the prefetch callback
+ * inside its post-commit handler, using a restricted controller that
+ * rejects precommit-only operations.
  *
  * Accepts an optional `transition` tuple to use directly.
  * When omitted, reads from TransitionContext instead. The
@@ -89,8 +92,9 @@ export function useNavigationHandlers(transition?: ReturnType<typeof useTransiti
    * `PrefetchContext` from the matched route information, awaits mandatory
    * guards, and only then forwards context to optional prefetch. Rejection
    * propagates to the Navigation API and prevents the post-commit handler.
-   * Runs before the URL commits, so no React state
-   * transitions are needed here.
+   * Normally runs before URL commit, without a React state transition.
+   * Custom adapters may await this callback after commit for noncancelable
+   * events, supplying a controller that rejects precommit-only operations.
    */
   function createPrecommitHandler(options: PrecommitHandlerOptions) {
     if (options.guard === undefined && options.prefetch === undefined) {
@@ -104,7 +108,10 @@ export function useNavigationHandlers(transition?: ReturnType<typeof useTransiti
         controller,
       }
 
-      await options.guard?.({ params: options.params, url: options.url })
+      if (options.guard !== undefined) {
+        await options.guard({ params: options.params, url: options.url })
+      }
+
       await options.prefetch?.(context)
     }
   }

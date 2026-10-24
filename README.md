@@ -36,7 +36,9 @@ const matcher = createRouter(route => {
 ```
 
 Guards run on initial rendering (including SSR) and during precommit for
-intercepted navigations and custom form actions, before prefetch. Group guards
+intercepted navigations and custom form actions, before prefetch. Noncancelable
+interceptable events run both checks after URL commit but before rendering or
+executing an action; failure does not roll back the committed URL. Group guards
 run parent-first. Async initial checks suspend before middleware and content;
 streaming SSR waits for them. `renderToString` cannot await async checks and
 emits the Suspense fallback instead. Initial failures reach an ancestor React
@@ -53,6 +55,11 @@ uses a no-op redirect controller, and does not run guards. Only preload data
 that is safe to request speculatively. Custom form actions now await prefetch
 as well as guards; a throwing/rejecting prefetch prevents the action. A call
 to `controller.redirect()` is not equivalent to throwing an access denial.
+Successful precommit redirects rematch and check the destination, then render
+it without running the abandoned form action or passing its body to a target
+action. Postcommit redirect attempts reject and prevent content/action updates.
+POSTs without an explicit custom `formHandler` remain native browser submissions
+and run neither guards nor prefetch.
 
 These checks control router UI and intercepted JavaScript actions. They are
 **not a server authorization boundary**. Every backend request must authenticate

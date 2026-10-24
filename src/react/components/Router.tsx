@@ -24,6 +24,38 @@ import { TransitionContext } from 'router/react:context/TransitionContext'
 import { PathnameContext } from 'router/react:context/PathnameContext'
 import { UrlContext } from 'router/react:context/UrlContext'
 import { extractPathname } from 'router/react:extractPathname'
+import { runPrefetch } from '../runPrefetch'
+
+/**
+ * Maximum redirect hops within one navigate event. A fixed bound prevents
+ * dynamic redirects from creating an infinite chain of distinct URLs.
+ */
+const MAX_REDIRECTS = 20
+
+/**
+ * Preserves the prefetch context shape when the browser cannot delay commit.
+ * Unlike hover prefetch, navigation must not silently ignore redirect or
+ * handler-registration requests: neither operation is valid after commit.
+ */
+const postcommitController: NavigationPrecommitController = {
+  /**
+   * Rejects redirects because the destination has already committed.
+   * The rejection propagates through the intercepted navigation promise.
+   */
+  redirect() {
+    throw new DOMException('cannot redirect after navigation commit', 'InvalidStateError')
+  },
+  /**
+   * Rejects precommit-only handler registration rather than dropping work.
+   * Prefetch should await its own work on this post-commit path instead.
+   */
+  addHandler() {
+    throw new DOMException(
+      'cannot add a precommit handler after navigation commit',
+      'InvalidStateError'
+    )
+  },
+}
 
 /**
  * Internal state tracked alongside the resolved route match.
@@ -33,7 +65,7 @@ import { extractPathname } from 'router/react:extractPathname'
 interface CurrentState {
   /**
    * Pending initial check, retained above Suspense so retries do not restart
-   * it. Navigation matches omit this because precommit already checked them.
+   * it. Navigation matches omit this because their checks already completed.
    */
   initialCheck?: Promise<void>
 
@@ -162,6 +194,10 @@ export interface RouterProps {
  * ultimately falls back to `window.navigation` when neither a prop
  * nor a context value is available.
  *
+ * POST form submissions remain native browser navigations unless
+ * the destination route explicitly provides a `formHandler`.
+ * GET forms follow the normal route rendering flow.
+ *
  * Provides several contexts to descendant components:
  * - `TransitionContext` — the `[isPending, startTransition]` tuple
  * - `NavigationContext` — the Navigation object
@@ -183,6 +219,36 @@ export interface RouterProps {
  *   route('/private').guard(requireSession).render(PrivatePage)
  * })
  * <Router matcher={matcher} fallback={<p>Checking access…</p>} />
+ * ```
+ *
+ * Redirect destinations are matched and prefetched before commit. Repeated
+ * URLs or chains exceeding 20 redirects reject the navigation. Scroll and
+ * focus options remain those of the first route: the Navigation API only
+ * permits intercept options to be set during event dispatch.
+ *
+ * Noncancelable, interceptable events run guards then prefetch after URL
+ * commit and before the React update. Rejection fails the handler without
+ * rolling back the committed URL or updating the route. Their prefetch
+ * controller rejects `redirect()` and `addHandler()` with InvalidStateError.
+ * Native redirects also reject during traverse/reload, even if cancelable;
+ * this Router does not emulate redirects with a second navigation.
+ * A redirected custom form renders the checked destination without executing
+ * either the abandoned action or a destination action with the original body.
+ * See the HTML Standard's NavigateEvent.intercept() restrictions:
+ * https://html.spec.whatwg.org/multipage/nav-history-apis.html#dom-navigateevent-intercept
+ *
+ * @example
+ * ```tsx
+ * import { createRoot } from 'react-dom/client'
+ * import { createMatcher } from '@studiolambda/router'
+ * import { Router, type Handler } from '@studiolambda/router/react'
+ *
+ * const matcher = createMatcher<Handler>()
+ * matcher.register('/', { component: () => <form method="post" action="/server-post" /> })
+ * // The browser submits this form because /server-post has no formHandler.
+ * const container = document.createElement('div')
+ * document.body.appendChild(container)
+ * createRoot(container).render(<Router matcher={matcher} />)
  * ```
  */
 export function Router(props: RouterProps) {
@@ -240,45 +306,80 @@ export function Router(props: RouterProps) {
    * This is necessary because Router provides TransitionContext
    * in its JSX return, which hasn't rendered at this point.
    */
-  const { createPrecommitHandler, createHandler } = useNavigationHandlers(transition)
+  const { createHandler } = useNavigationHandlers(transition)
 
   /**
-   * Central navigate event handler. Intercepts all same-document
-   * navigations including link clicks, form submissions,
+   * Central navigate event handler. Intercepts eligible
+   * navigations including link clicks, opted-in POST submissions,
    * back/forward buttons, and programmatic navigation.
    *
    * Skips non-interceptable navigations, hash-only changes,
    * and download requests. For form submissions with a dedicated
    * `formHandler`, delegates to that handler instead of the
-   * normal component render flow.
+   * normal component render flow. Leaves other POST submissions
+   * untouched so the browser sends their bodies to the server.
    */
   const onNavigate = useEffectEvent(function (event: NavigateEvent) {
     if (!event.canIntercept || event.hashChange || event.downloadRequest !== null) {
       return
     }
 
-    const match = next(event.destination.url, notFound)
-    const precommitHandler = createPrecommitHandler({
-      guard: match.handler.guard,
-      prefetch: match.handler.prefetch,
-      params: match.params,
-      url: new URL(event.destination.url),
-    })
-
-    if (event.formData !== null && match.handler.formHandler !== undefined) {
-      event.intercept({
-        precommitHandler,
-        scroll: match.handler.scroll,
-        focusReset: match.handler.focusReset,
-        async handler() {
-          await match.handler.formHandler!(event.formData!, event)
-        },
-      })
-
+    /** Original URL owns a form body; redirects must never forward it. */
+    const initialUrl = event.destination.url
+    /** Original route supplies an action only while its URL is unchanged. */
+    const initialMatch = next(initialUrl, notFound)
+    /** Final render match, replaced as redirects are processed in precommit. */
+    let match = initialMatch
+    /** Native POST ownership is decided before running any route checks. */
+    if (event.formData !== null && initialMatch.handler.formHandler === undefined) {
       return
     }
 
-    const handler = createHandler(function () {
+    /**
+     * Follows mutations of this event's destination, not new navigate events.
+     * Each destination runs its own guards before any React state is updated.
+     * The hop bound also catches dynamic loops that generate unique URLs.
+     */
+    async function precommitHandler(controller: NavigationPrecommitController) {
+      /** Full URLs already processed, including query and fragment. */
+      const visited = new Set<string>()
+
+      for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+        /** Snapshot used for this route's params and prefetch context. */
+        const url = event.destination.url
+
+        if (visited.has(url)) {
+          throw new Error(`redirect cycle detected: ${url}`)
+        }
+
+        visited.add(url)
+        /** Shared destination snapshot for its guard and subsequent preload. */
+        const context = { params: match.params, url: new URL(url) }
+
+        if (match.handler.guard !== undefined) {
+          await match.handler.guard(context)
+        }
+
+        /** True even for a redirect back to the same destination URL. */
+        const hasRedirected = await runPrefetch(match.handler.prefetch, {
+          ...context,
+          controller,
+        })
+
+        if (!hasRedirected) return
+
+        match = next(event.destination.url, notFound)
+      }
+
+      throw new Error(`redirect limit exceeded: maximum ${MAX_REDIRECTS} redirects`)
+    }
+
+    const handler = createHandler(async function () {
+      if (event.formData !== null && event.destination.url === initialUrl) {
+        await initialMatch.handler.formHandler!(event.formData, event)
+        return
+      }
+
       setCurrent({
         match,
         signal: event.signal,
@@ -288,9 +389,25 @@ export function Router(props: RouterProps) {
       })
     })
 
+    /** Both kinds of checks obey the same native precommit restrictions. */
+    const checks = initialMatch.handler.guard ?? initialMatch.handler.prefetch
+
+    if (!event.cancelable && checks !== undefined) {
+      event.intercept({
+        async handler() {
+          await precommitHandler(postcommitController)
+          await handler()
+        },
+        scroll: match.handler.scroll,
+        focusReset: match.handler.focusReset,
+      })
+
+      return
+    }
+
     event.intercept({
       handler,
-      precommitHandler,
+      precommitHandler: checks === undefined ? undefined : precommitHandler,
       scroll: match.handler.scroll,
       focusReset: match.handler.focusReset,
     })
